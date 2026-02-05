@@ -452,10 +452,16 @@ function updatePresence() {
 }
 
 async function refreshVotes() {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("votes")
     .select("participant_id,value,confidence")
     .eq("session_id", state.sessionId);
+  if (error && isMissingColumnError(error, "confidence")) {
+    ({ data, error } = await supabase
+      .from("votes")
+      .select("participant_id,value")
+      .eq("session_id", state.sessionId));
+  }
   if (error) {
     showError("Votes ophalen mislukt.");
     return false;
@@ -645,16 +651,7 @@ async function trySubmitPendingVote() {
 
 async function submitVote(value, confidence) {
   const now = new Date().toISOString();
-  const { error } = await supabase.from("votes").upsert(
-    {
-      session_id: state.sessionId,
-      participant_id: state.participantId,
-      value,
-      confidence
-    },
-    { onConflict: "session_id,participant_id" }
-  );
-
+  const error = await writeVote(value, confidence);
   if (error) {
     showError("Stemmen mislukt.");
     return false;
@@ -666,6 +663,79 @@ async function submitVote(value, confidence) {
     .eq("id", state.sessionId);
 
   return true;
+}
+
+async function writeVote(value, confidence) {
+  let includeConfidence = true;
+  let error = await tryUpsertVote(value, confidence, includeConfidence);
+  if (error && isMissingColumnError(error, "confidence")) {
+    includeConfidence = false;
+    error = await tryUpsertVote(value, confidence, includeConfidence);
+  }
+  if (error && isOnConflictError(error)) {
+    error = await updateThenInsertVote(value, confidence, includeConfidence);
+    if (error && includeConfidence && isMissingColumnError(error, "confidence")) {
+      includeConfidence = false;
+      error = await updateThenInsertVote(value, confidence, includeConfidence);
+    }
+  }
+  return error;
+}
+
+async function tryUpsertVote(value, confidence, includeConfidence) {
+  const payload = buildVotePayload(value, confidence, includeConfidence);
+  const { error } = await supabase.from("votes").upsert(payload, {
+    onConflict: "session_id,participant_id"
+  });
+  return error;
+}
+
+async function updateThenInsertVote(value, confidence, includeConfidence) {
+  const updatePayload = buildVoteUpdatePayload(value, confidence, includeConfidence);
+  let { data, error } = await supabase
+    .from("votes")
+    .update(updatePayload)
+    .eq("session_id", state.sessionId)
+    .eq("participant_id", state.participantId)
+    .select("id");
+
+  if (error) {
+    return error;
+  }
+  if (Array.isArray(data) && data.length > 0) {
+    return null;
+  }
+
+  const insertPayload = buildVotePayload(value, confidence, includeConfidence);
+  ({ error } = await supabase.from("votes").insert(insertPayload));
+  if (error && isDuplicateKeyError(error)) {
+    ({ error } = await supabase
+      .from("votes")
+      .update(updatePayload)
+      .eq("session_id", state.sessionId)
+      .eq("participant_id", state.participantId));
+  }
+  return error;
+}
+
+function buildVotePayload(value, confidence, includeConfidence) {
+  const payload = {
+    session_id: state.sessionId,
+    participant_id: state.participantId,
+    value
+  };
+  if (includeConfidence) {
+    payload.confidence = confidence;
+  }
+  return payload;
+}
+
+function buildVoteUpdatePayload(value, confidence, includeConfidence) {
+  const payload = { value };
+  if (includeConfidence) {
+    payload.confidence = confidence;
+  }
+  return payload;
 }
 
 async function touchSession() {
@@ -1265,6 +1335,29 @@ function formatSeconds(totalSeconds) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function errorText(error) {
+  if (!error) {
+    return "";
+  }
+  return [error.message, error.details, error.hint, error.code]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function isMissingColumnError(error, column) {
+  const text = errorText(error);
+  return text.includes(`column "${column}"`) && text.includes("does not exist");
+}
+
+function isOnConflictError(error) {
+  return error?.code === "42P10" || errorText(error).includes("on conflict");
+}
+
+function isDuplicateKeyError(error) {
+  return error?.code === "23505" || errorText(error).includes("duplicate key");
 }
 
 function randomIndex(max) {
