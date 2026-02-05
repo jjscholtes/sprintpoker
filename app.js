@@ -211,7 +211,16 @@ function wireEvents() {
       showError(nextRevealed ? "Reveal mislukt." : "Verbergen mislukt.");
       return;
     }
-    await refreshVotes();
+    state.revealed = nextRevealed;
+    if (state.session) {
+      state.session.revealed = nextRevealed;
+      state.session.last_activity_at = now;
+    }
+    if (nextRevealed) {
+      await refreshVotes();
+    } else {
+      render();
+    }
   });
 
   els.resetBtn.addEventListener("click", async () => {
