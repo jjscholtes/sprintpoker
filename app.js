@@ -104,12 +104,11 @@ async function init() {
   supabase = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
   void syncServerTime();
 
-  const path = window.location.pathname;
-  if (path.startsWith("/s/")) {
-    const parts = path.split("/").filter(Boolean);
-    state.sessionId = parts[1];
+  const sessionId = getSessionIdFromPath(window.location.pathname);
+  if (sessionId) {
+    state.sessionId = sessionId;
     showSessionView();
-    void loadSession(state.sessionId);
+    void loadSession(sessionId);
   } else {
     showLandingView();
   }
@@ -150,6 +149,10 @@ async function loadConfig() {
 }
 
 function wireEvents() {
+  window.addEventListener("popstate", () => {
+    void syncViewToRoute();
+  });
+
   els.createSession.addEventListener("click", async () => {
     clearError();
     if (!ensureSupabaseReady()) {
@@ -280,7 +283,53 @@ async function createSession() {
     return;
   }
 
-  window.location.href = `/s/${sessionId}`;
+  await openSession(sessionId);
+}
+
+async function openSession(sessionId) {
+  const targetPath = `/s/${sessionId}`;
+  if (window.location.pathname !== targetPath) {
+    window.history.pushState({ sessionId }, "", targetPath);
+  }
+  state.sessionId = sessionId;
+  showSessionView();
+  await loadSession(sessionId);
+}
+
+async function syncViewToRoute() {
+  const sessionId = getSessionIdFromPath(window.location.pathname);
+  if (sessionId) {
+    if (!supabase) {
+      return;
+    }
+    if (state.channel && state.sessionId !== sessionId) {
+      await state.channel.unsubscribe();
+      state.channel = null;
+    }
+    state.sessionId = sessionId;
+    showSessionView();
+    await loadSession(sessionId);
+    return;
+  }
+
+  if (state.channel) {
+    await state.channel.unsubscribe();
+    state.channel = null;
+  }
+  state.sessionId = null;
+  state.session = null;
+  state.participants = [];
+  state.votes = new Map();
+  state.revealed = false;
+  showLandingView();
+}
+
+function getSessionIdFromPath(pathname) {
+  if (!pathname.startsWith("/s/")) {
+    return null;
+  }
+  const parts = pathname.split("/").filter(Boolean);
+  return parts[1] ?? null;
 }
 
 async function loadSession(sessionId) {
