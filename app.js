@@ -476,7 +476,8 @@ async function refreshVotes() {
       .eq("session_id", state.sessionId));
   }
   if (error) {
-    showError("Votes ophalen mislukt.");
+    console.error("Votes fetch failed:", error);
+    showError(getVotesErrorMessage(error, "Votes ophalen mislukt."));
     return false;
   }
   state.votes = new Map(
@@ -691,7 +692,7 @@ async function submitVote(value, confidence, includeConfidence = true) {
   const error = await writeVote(value, confidence, includeConfidence);
   if (error) {
     console.error("Vote upsert failed:", error);
-    showError("Stemmen mislukt.");
+    showError(getVotesErrorMessage(error, "Stemmen mislukt."));
     return false;
   }
 
@@ -1421,6 +1422,29 @@ function errorText(error) {
 function isMissingColumnError(error, column) {
   const text = errorText(error);
   return text.includes(`column "${column}"`) && text.includes("does not exist");
+}
+
+function isMissingTableError(error, table) {
+  if (error?.code === "42P01") {
+    return true;
+  }
+  const text = errorText(error);
+  return (
+    text.includes(`relation "${table}"`) ||
+    text.includes(`relation "public.${table}"`) ||
+    text.includes(`relation ${table}`) ||
+    text.includes(`relation public.${table}`)
+  ) && text.includes("does not exist");
+}
+
+function getVotesErrorMessage(error, fallbackMessage) {
+  if (isMissingTableError(error, "votes")) {
+    return "Votes tabel ontbreekt in Supabase. Draai supabase/schema.sql opnieuw.";
+  }
+  if (isMissingColumnError(error, "confidence")) {
+    return "Votes schema mist de kolom confidence. Draai supabase/schema.sql opnieuw.";
+  }
+  return fallbackMessage;
 }
 
 function isOnConflictError(error) {
