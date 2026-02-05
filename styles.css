@@ -331,20 +331,41 @@ button:disabled {
 }
 
 #session.join-mode {
-  min-height: calc(100vh - 220px);
+  min-height: calc(100vh - 190px);
   display: grid;
   align-content: center;
-  gap: 20px;
+  justify-items: center;
+  gap: 22px;
 }
 
 #session.join-mode .session-header {
-  width: 100%;
-  max-width: 780px;
-  margin: 0 auto;
+  width: min(100%, 720px);
+  margin: 0;
+  padding: 0 4px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+#session.join-mode .session-title {
+  min-width: 0;
+}
+
+#session.join-mode .session-meta {
+  margin-top: 2px;
 }
 
 #session.join-mode .join-card {
-  width: min(100%, 520px);
+  width: min(100%, 720px);
+  max-width: none;
+  margin: 0;
+  padding: 34px 34px 30px;
+}
+
+#session.join-mode #join-form {
+  max-width: 560px;
+  margin: 0 auto;
 }
 
 .session-header {
@@ -941,8 +962,21 @@ button:disabled {
   }
 
   #session.join-mode {
-    min-height: auto;
-    display: block;
+    min-height: calc(100vh - 150px);
+    gap: 18px;
+  }
+
+  #session.join-mode .session-header {
+    width: min(100%, 640px);
+  }
+
+  #session.join-mode .join-card {
+    width: min(100%, 640px);
+    padding: 28px 24px 24px;
+  }
+
+  #session.join-mode #join-form {
+    max-width: none;
   }
 
   .table-surface {
@@ -1031,6 +1065,25 @@ button:disabled {
   #session.join-mode {
     min-height: auto;
     display: block;
+  }
+
+  #session.join-mode .session-header {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 0;
+  }
+
+  #session.join-mode .copy-link-btn {
+    align-self: flex-start;
+  }
+
+  #session.join-mode .join-card {
+    width: 100%;
+    padding: 22px 18px 20px;
   }
 
   .app-header {
