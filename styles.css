@@ -887,12 +887,24 @@ button:disabled {
     gap: 12px;
   }
 
-  #join-form {
+  .join-row {
     flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
   }
 
-  #join-form button {
+  .join-row .emoji-picker-btn {
+    width: 52px;
+    height: 52px;
+    align-self: flex-start;
+  }
+
+  .join-row > button[type="submit"] {
     width: 100%;
+  }
+
+  #name-input {
+    font-size: 16px;
   }
 
   .timer-circle {
