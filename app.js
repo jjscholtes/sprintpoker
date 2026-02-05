@@ -566,10 +566,11 @@ function renderParticipants() {
 
   const nameInstances = {};
   els.participants.innerHTML = "";
+  const totalParticipants = state.participants.length;
 
-  if (state.participants.length === 0) {
+  if (totalParticipants === 0) {
     const empty = document.createElement("li");
-    empty.className = "participant";
+    empty.className = "participant waiting";
     empty.innerHTML = `
       <div class="card not-voted"></div>
       <div class="avatar" style="background: #e2e8f0; color: #64748b;">?</div>
@@ -625,6 +626,10 @@ function renderParticipants() {
       <span class="name">${displayName}</span>
     `;
 
+    const { left, top } = getParticipantPosition(index, totalParticipants);
+    li.style.left = `${left}%`;
+    li.style.top = `${top}%`;
+
     // Keep the old vote span for compatibility
     const voteEl = document.createElement("span");
     voteEl.className = "vote";
@@ -633,6 +638,36 @@ function renderParticipants() {
 
     els.participants.appendChild(li);
   });
+}
+
+function getParticipantPosition(index, total) {
+  if (total <= 1) {
+    return { left: 50, top: 22 };
+  }
+
+  const angle = -Math.PI / 2 + (index / total) * (Math.PI * 2);
+  const { radiusX, radiusY } = getParticipantRadii(total);
+
+  return {
+    left: 50 + Math.cos(angle) * radiusX,
+    top: 50 + Math.sin(angle) * radiusY
+  };
+}
+
+function getParticipantRadii(total) {
+  if (total <= 2) {
+    return { radiusX: 30, radiusY: 26 };
+  }
+  if (total <= 4) {
+    return { radiusX: 34, radiusY: 29 };
+  }
+  if (total <= 6) {
+    return { radiusX: 38, radiusY: 31 };
+  }
+  if (total <= 8) {
+    return { radiusX: 41, radiusY: 33 };
+  }
+  return { radiusX: 44, radiusY: 35 };
 }
 
 function renderStatus() {

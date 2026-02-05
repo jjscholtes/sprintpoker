@@ -615,14 +615,28 @@ button:disabled {
 /* ===== POKER TABLE - Minimal Elegant Design ===== */
 .table-surface {
   position: relative;
-  min-height: 280px;
+  min-height: 420px;
   border-radius: 24px;
   background: var(--bg-subtle);
   border: 1px solid var(--border);
-  padding: 32px;
+  padding: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.table-surface::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(78%, 620px);
+  height: clamp(150px, 40%, 240px);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.09), rgba(37, 99, 235, 0.03));
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  pointer-events: none;
 }
 
 /* Center reveal button area */
@@ -666,17 +680,17 @@ button:disabled {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px;
-  justify-content: center;
-  align-items: flex-end;
+  position: relative;
+  width: min(100%, 780px);
+  height: clamp(280px, 44vw, 420px);
   z-index: 1;
-  width: 100%;
-  max-width: 700px;
 }
 
 .participant {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -713,7 +727,7 @@ button:disabled {
   font-size: 13px;
   font-weight: 500;
   color: var(--ink);
-  max-width: 80px;
+  max-width: 120px;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -1012,12 +1026,26 @@ button:disabled {
   }
 
   .table-surface {
-    min-height: 300px;
+    min-height: 320px;
     padding: 24px;
   }
 
   .participant-ring {
+    position: static;
+    width: 100%;
+    height: auto;
+    display: flex;
+    flex-wrap: wrap;
     gap: 16px;
+    justify-content: center;
+    align-items: flex-end;
+  }
+
+  .participant {
+    position: static;
+    left: auto;
+    top: auto;
+    transform: none;
   }
 
   .participant .avatar {
