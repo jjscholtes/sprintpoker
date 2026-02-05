@@ -115,6 +115,14 @@ async function init() {
   }
 }
 
+function ensureSupabaseReady() {
+  if (!supabase) {
+    showError("De app is nog aan het laden. Probeer het zo nog eens.");
+    return false;
+  }
+  return true;
+}
+
 async function loadConfig() {
   if (
     window.APP_CONFIG?.SUPABASE_URL &&
@@ -144,6 +152,9 @@ async function loadConfig() {
 function wireEvents() {
   els.createSession.addEventListener("click", async () => {
     clearError();
+    if (!ensureSupabaseReady()) {
+      return;
+    }
     await createSession();
   });
 
@@ -169,6 +180,9 @@ function wireEvents() {
   els.joinForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     clearError();
+    if (!ensureSupabaseReady()) {
+      return;
+    }
     const name = els.nameInput.value.trim();
     if (!name) {
       showError("Vul je naam in om mee te doen.");
@@ -181,25 +195,30 @@ function wireEvents() {
 
   els.revealBtn.addEventListener("click", async () => {
     clearError();
+    if (!ensureSupabaseReady()) {
+      return;
+    }
     if (!(await ensureActiveSession())) {
       return;
     }
     const now = new Date().toISOString();
+    const nextRevealed = !state.revealed;
     const { error } = await supabase
       .from("sessions")
-      .update({ revealed: true, last_activity_at: now })
+      .update({ revealed: nextRevealed, last_activity_at: now })
       .eq("id", state.sessionId);
     if (error) {
-      showError("Reveal mislukt.");
+      showError(nextRevealed ? "Reveal mislukt." : "Verbergen mislukt.");
       return;
     }
-    const refreshed = await refreshVotes();
-    if (refreshed) {
-    }
+    await refreshVotes();
   });
 
   els.resetBtn.addEventListener("click", async () => {
     clearError();
+    if (!ensureSupabaseReady()) {
+      return;
+    }
     if (!(await ensureActiveSession())) {
       return;
     }
@@ -330,7 +349,7 @@ async function joinSession(name) {
         void refreshVotes();
       }
     )
-    .on(
+  .on(
       "postgres_changes",
       {
         event: "*",
@@ -342,16 +361,8 @@ async function joinSession(name) {
         const wasRevealed = state.revealed;
         state.session = payload.new ?? state.session;
         state.revealed = state.session?.revealed ?? false;
-        if (wasRevealed && !state.revealed) {
-          clearVotesState(false);
-          return;
-        }
         if (!wasRevealed && state.revealed) {
-          void refreshVotes().then((refreshed) => {
-            if (refreshed) {
-              void evaluateDeadlockAfterReveal();
-            }
-          });
+          void refreshVotes();
         }
         render();
       }
@@ -399,6 +410,8 @@ async function refreshVotes() {
   if (error) {
     console.error("Votes fetch failed:", error);
     showError(getVotesErrorMessage(error, "Votes ophalen mislukt."));
+    state.votes = new Map();
+    render();
     return false;
   }
   state.votes = new Map(data.map((vote) => [vote.participant_id, vote.value]));
@@ -465,6 +478,13 @@ async function handleCardSelection(value) {
 }
 
 async function submitVote(value) {
+  if (!ensureSupabaseReady()) {
+    return false;
+  }
+  if (!state.participantId) {
+    showError("Doe eerst mee aan de sessie om te stemmen.");
+    return false;
+  }
   const now = new Date().toISOString();
   const { error } = await supabase.from("votes").upsert(
     {
@@ -605,7 +625,10 @@ function renderStatus() {
   const revealLabel = state.revealed ? "Onthuld" : "Verborgen";
   els.status.textContent = `${total} deelnemers, ${voted} gestemd · ${revealLabel}`;
 
-  els.revealBtn.disabled = voted === 0 || state.revealed;
+  if (els.revealBtn) {
+    els.revealBtn.textContent = state.revealed ? "Verberg kaarten" : "Reveal kaarten";
+  }
+  els.revealBtn.disabled = !state.revealed && voted === 0;
   els.resetBtn.disabled = voted === 0 && !state.revealed;
 }
 
