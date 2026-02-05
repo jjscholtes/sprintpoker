@@ -718,6 +718,7 @@ function isExpired(lastActivity) {
 function showLandingView() {
   els.landing.classList.remove("hidden");
   els.session.classList.add("hidden");
+  els.session.classList.remove("join-mode");
 }
 
 function showSessionView() {
@@ -728,11 +729,13 @@ function showSessionView() {
 function showJoin() {
   els.join.classList.remove("hidden");
   els.table.classList.add("hidden");
+  els.session.classList.add("join-mode");
 }
 
 function showTable() {
   els.join.classList.add("hidden");
   els.table.classList.remove("hidden");
+  els.session.classList.remove("join-mode");
   render();
   if (!state.timerIntervalId) {
     setTimerDisplay(getSelectedDuration());
@@ -744,6 +747,7 @@ function setExpiredState(expired) {
     els.expired.classList.remove("hidden");
     els.join.classList.add("hidden");
     els.table.classList.add("hidden");
+    els.session.classList.remove("join-mode");
   } else {
     els.expired.classList.add("hidden");
   }
