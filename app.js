@@ -566,6 +566,7 @@ function handleCardSelection(value, button) {
     state.pendingConfidence = null;
     hideConfidencePopover();
     updateConfidenceUI();
+    renderCards();
     void trySubmitPendingVote();
     return;
   }
@@ -591,6 +592,9 @@ function handleCardSelection(value, button) {
 
 function showConfidencePopover(button) {
   if (!els.confidencePopover || !els.cardSection) {
+    return;
+  }
+  if (!state.confidenceEnabled) {
     return;
   }
   els.confidencePopover.classList.remove("hidden");
@@ -686,6 +690,7 @@ async function submitVote(value, confidence, includeConfidence = true) {
   const now = new Date().toISOString();
   const error = await writeVote(value, confidence, includeConfidence);
   if (error) {
+    console.error("Vote upsert failed:", error);
     showError("Stemmen mislukt.");
     return false;
   }
@@ -819,6 +824,9 @@ function setConfidenceEnabled(enabled, { persist = true } = {}) {
   if (els.confidenceToggle) {
     els.confidenceToggle.textContent = enabled ? "Confidence aan" : "Confidence uit";
     els.confidenceToggle.setAttribute("aria-pressed", String(enabled));
+  }
+  if (els.confidenceRange) {
+    els.confidenceRange.disabled = !enabled;
   }
   if (!enabled) {
     hideConfidencePopover();
