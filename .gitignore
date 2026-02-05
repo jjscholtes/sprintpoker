@@ -1,0 +1,8 @@
+.DS_Store
+.vercel
+
+# Local config/secrets
+config.json
+.env
+.env.local
+.env.*.local

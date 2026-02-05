@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/s/:sessionId", "destination": "/index.html" },
+    { "source": "/s/:sessionId/", "destination": "/index.html" }
+  ]
+}

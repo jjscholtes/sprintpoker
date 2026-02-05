@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="nl">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sprint Poker</title>
+  <meta name="description" content="Snel, simpel en realtime sprint planning poker voor agile teams." />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+
+<body>
+  <!-- Circular Timer (top-left) -->
+  <div id="timer-circle" class="timer-circle">
+    <svg viewBox="0 0 36 36">
+      <circle class="timer-bg" cx="18" cy="18" r="16" />
+      <circle id="timer-progress" class="timer-progress" cx="18" cy="18" r="16" stroke-dasharray="100.53"
+        stroke-dashoffset="0" />
+    </svg>
+    <div id="timer-text" class="timer-text">02:00</div>
+  </div>
+
+  <main class="shell">
+    <header class="app-header">
+      <div class="brand">Sprint Poker</div>
+    </header>
+
+    <div id="global-error" class="notice error hidden"></div>
+
+    <!-- Landing -->
+    <section id="landing" class="panel landing-panel">
+      <div class="landing-grid">
+        <div class="landing-hero">
+          <div class="eyebrow">Start binnen 10 seconden</div>
+          <h1>Estimate together</h1>
+          <p class="lead">
+            Maak een sessie, deel de link en begin direct met schatten.
+            Iedereen kan revealen en een nieuwe ronde starten.
+          </p>
+          <div class="cta-row">
+            <button id="create-session" class="primary cta-large">Start nieuwe sessie</button>
+            <span class="cta-note">Geen account. Geen installaties.</span>
+          </div>
+          <p class="hint">Heb je een link? Plak die gewoon in je browser.</p>
+        </div>
+        <div class="landing-steps">
+          <div class="step-card">
+            <div class="step-index">1</div>
+            <h3>Start een spel</h3>
+            <p>Creëer een sessie en kopieer de link.</p>
+          </div>
+          <div class="step-card">
+            <div class="step-index">2</div>
+            <h3>Nodig je team uit</h3>
+            <p>Deel de URL, iedereen kan direct meedoen.</p>
+          </div>
+          <div class="step-card">
+            <div class="step-index">3</div>
+            <h3>Stem en onthul</h3>
+            <p>Kies een kaart, reveal de stemmen.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Session -->
+    <section id="session" class="panel hidden">
+      <div class="session-header">
+        <div class="session-title">
+          <div class="eyebrow">Sessie</div>
+          <div class="session-meta">
+            <span class="meta">ID: <span id="session-id">-</span></span>
+          </div>
+        </div>
+        <button id="copy-link" class="ghost copy-link-btn">📋 Kopieer link</button>
+      </div>
+
+      <div id="expired" class="notice hidden">
+        <div>
+          <strong>Sessie verlopen.</strong>
+          Deze sessie is langer dan 3 uur inactief geweest.
+        </div>
+        <button id="expired-create" class="primary">Nieuwe sessie</button>
+      </div>
+
+      <!-- Join -->
+      <div id="join" class="join-card panel-card">
+        <div class="step-chip">Stap 1</div>
+        <h3>Doe mee</h3>
+        <p class="muted">Kies een emoji en vul je naam in</p>
+        <form id="join-form">
+          <div class="join-row">
+            <button type="button" id="emoji-picker-btn" class="emoji-picker-btn" title="Kies een emoji">😊</button>
+            <input id="name-input" type="text" autocomplete="name" placeholder="Je naam" required />
+            <button type="submit" class="primary">Join</button>
+          </div>
+        </form>
+        <div id="emoji-picker" class="emoji-picker hidden">
+          <div class="emoji-grid"></div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div id="table" class="table hidden">
+        <div class="table-stage">
+          <!-- Floating toolbar -->
+          <div class="toolbar-actions">
+            <div class="timer">
+              <select id="timer-duration" class="timer-select">
+                <option value="60">1 min</option>
+                <option value="120" selected>2 min</option>
+                <option value="180">3 min</option>
+                <option value="300">5 min</option>
+              </select>
+              <button id="timer-toggle" class="ghost">Start</button>
+              <span id="timer-display" class="timer-display">02:00</span>
+            </div>
+            <div class="actions">
+              <button id="reveal-btn" class="primary">Reveal cards</button>
+              <button id="reset-btn" class="ghost">Nieuwe ronde</button>
+            </div>
+            <div class="scoreline">
+              <span class="label">Gem:</span>
+              <strong id="average">-</strong>
+            </div>
+          </div>
+
+          <!-- Table surface -->
+          <div class="table-surface">
+            <div class="table-center">
+              <!-- The center reveal button is handled by the bottom toolbar now -->
+            </div>
+            <ul id="participants" class="participant-ring"></ul>
+          </div>
+
+          <!-- Status pill (hidden in new design, but kept for JS) -->
+          <span id="status" class="status-pill" style="display: none;">-</span>
+        </div>
+
+        <div class="card-section panel-card">
+          <div class="section-title">Kies een waarde</div>
+          <div id="card-grid" class="card-grid"></div>
+          <div id="confidence-popover" class="confidence-popover hidden" aria-live="polite">
+            <div class="confidence-top">
+              <div id="confidence-preview" class="confidence-preview">-</div>
+              <div class="confidence-copy">
+                <div class="confidence-title">Confidence</div>
+                <div class="confidence-score"><span id="confidence-value">-</span>%</div>
+                <div id="confidence-hint" class="confidence-hint">Sleep om te bevestigen</div>
+              </div>
+            </div>
+            <div class="confidence-slider">
+              <span class="confidence-label top">Ik heb de code al voor me</span>
+              <input id="confidence-range" class="confidence-range" type="range" min="0" max="100" value="50"
+                step="1" />
+              <span class="confidence-label bottom">Natte vingerwerk</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="devils-advocate" class="devils-advocate hidden" role="dialog" aria-live="polite">
+    <div class="devils-card">
+      <div class="devils-title">Wheel of Fate</div>
+      <div class="devils-wheel"></div>
+      <div id="devils-advocate-message" class="devils-message">-</div>
+      <div class="devils-timer">
+        <span id="devils-advocate-time" class="devils-time">01:00</span>
+        <span class="devils-note">Na afloop stemt iedereen opnieuw.</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+
+</html>
