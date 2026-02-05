@@ -3,6 +3,7 @@
 
 # Local docs
 *.md
+!README.md
 
 # Local config/secrets
 config.json
