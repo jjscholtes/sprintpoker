@@ -79,7 +79,7 @@ const state = {
   sessionId: null,
   participantId: null,
   name: null,
-  selectedEmoji: "�",
+  selectedEmoji: "🚀",
   session: null,
   votes: new Map(),
   participants: [],
