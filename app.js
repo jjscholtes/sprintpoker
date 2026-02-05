@@ -96,7 +96,7 @@ async function init() {
   const config = await loadConfig();
   if (!config?.SUPABASE_URL || !config?.SUPABASE_ANON_KEY) {
     showError(
-      "Supabase config ontbreekt. Vul SUPABASE_URL en SUPABASE_ANON_KEY in config.json of in Vercel Environment Variables."
+      "Supabase config is missing. Set SUPABASE_URL and SUPABASE_ANON_KEY in config.json or Vercel Environment Variables."
     );
     return;
   }
@@ -116,7 +116,7 @@ async function init() {
 
 function ensureSupabaseReady() {
   if (!supabase) {
-    showError("De app is nog aan het laden. Probeer het zo nog eens.");
+    showError("The app is still loading. Please try again.");
     return false;
   }
   return true;
@@ -149,10 +149,6 @@ async function loadConfig() {
 }
 
 function wireEvents() {
-  window.addEventListener("popstate", () => {
-    void syncViewToRoute();
-  });
-
   els.createSession.addEventListener("click", async () => {
     clearError();
     if (!ensureSupabaseReady()) {
@@ -165,13 +161,13 @@ function wireEvents() {
     const link = window.location.href;
     const copied = await copyToClipboard(link);
     if (copied) {
-      els.copyLink.textContent = "Gekopieerd";
+      els.copyLink.textContent = "Copied";
       setTimeout(() => {
-        els.copyLink.textContent = "Kopieer link";
+        els.copyLink.textContent = "Copy link";
       }, 1600);
     } else {
       showError(
-        "Kopieren mislukt. De link is geselecteerd—kopieer met Ctrl/Cmd+C."
+        "Copy failed. The link is selected, so copy with Ctrl/Cmd+C."
       );
     }
   });
@@ -188,7 +184,7 @@ function wireEvents() {
     }
     const name = els.nameInput.value.trim();
     if (!name) {
-      showError("Vul je naam in om mee te doen.");
+      showError("Enter your name to join.");
       return;
     }
     localStorage.setItem(`sp_name_${state.sessionId}`, name);
@@ -211,7 +207,7 @@ function wireEvents() {
       .update({ revealed: nextRevealed, last_activity_at: now })
       .eq("id", state.sessionId);
     if (error) {
-      showError(nextRevealed ? "Reveal mislukt." : "Verbergen mislukt.");
+      showError(nextRevealed ? "Reveal failed." : "Hide cards failed.");
       return;
     }
     state.revealed = nextRevealed;
@@ -240,7 +236,7 @@ function wireEvents() {
       .eq("session_id", state.sessionId);
     if (deleteError && !isMissingTableError(deleteError, "votes")) {
       console.error("Votes delete failed:", deleteError);
-      showError(getVotesErrorMessage(deleteError, "Nieuwe ronde mislukt."));
+      showError(getVotesErrorMessage(deleteError, "New round failed."));
       return;
     }
     const now = new Date().toISOString();
@@ -250,7 +246,7 @@ function wireEvents() {
       .eq("id", state.sessionId);
     if (updateError) {
       console.error("Session reset failed:", updateError);
-      showError("Nieuwe ronde mislukt.");
+      showError("New round failed.");
       return;
     }
     clearVotesState(false);
@@ -279,49 +275,11 @@ async function createSession() {
     .insert({ id: sessionId, revealed: false, last_activity_at: now });
 
   if (error) {
-    showError("Sessie aanmaken mislukt.");
+    showError("Failed to create session.");
     return;
   }
 
-  await openSession(sessionId);
-}
-
-async function openSession(sessionId) {
-  const targetPath = `/s/${sessionId}`;
-  if (window.location.pathname !== targetPath) {
-    window.history.pushState({ sessionId }, "", targetPath);
-  }
-  state.sessionId = sessionId;
-  showSessionView();
-  await loadSession(sessionId);
-}
-
-async function syncViewToRoute() {
-  const sessionId = getSessionIdFromPath(window.location.pathname);
-  if (sessionId) {
-    if (!supabase) {
-      return;
-    }
-    if (state.channel && state.sessionId !== sessionId) {
-      await state.channel.unsubscribe();
-      state.channel = null;
-    }
-    state.sessionId = sessionId;
-    showSessionView();
-    await loadSession(sessionId);
-    return;
-  }
-
-  if (state.channel) {
-    await state.channel.unsubscribe();
-    state.channel = null;
-  }
-  state.sessionId = null;
-  state.session = null;
-  state.participants = [];
-  state.votes = new Map();
-  state.revealed = false;
-  showLandingView();
+  window.location.href = `/s/${sessionId}`;
 }
 
 function getSessionIdFromPath(pathname) {
@@ -341,7 +299,7 @@ async function loadSession(sessionId) {
     .maybeSingle();
 
   if (error || !data) {
-    showError("Sessie niet gevonden. Maak een nieuwe sessie aan.");
+    showError("Session not found. Create a new session.");
     setExpiredState(true);
     return;
   }
@@ -436,7 +394,7 @@ async function joinSession(name) {
       });
     }
     if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-      showError("Realtime verbinding mislukt.");
+      showError("Realtime connection failed.");
     }
   });
 
@@ -467,7 +425,7 @@ async function refreshVotes() {
     .eq("session_id", state.sessionId);
   if (error) {
     console.error("Votes fetch failed:", error);
-    showError(getVotesErrorMessage(error, "Votes ophalen mislukt."));
+    showError(getVotesErrorMessage(error, "Failed to load votes."));
     state.votes = new Map();
     render();
     return false;
@@ -540,7 +498,7 @@ async function submitVote(value) {
     return false;
   }
   if (!state.participantId) {
-    showError("Doe eerst mee aan de sessie om te stemmen.");
+    showError("Join the session before voting.");
     return false;
   }
   const now = new Date().toISOString();
@@ -555,7 +513,7 @@ async function submitVote(value) {
 
   if (error) {
     console.error("Vote upsert failed:", error);
-    showError(getVotesErrorMessage(error, "Stemmen mislukt."));
+    showError(getVotesErrorMessage(error, "Voting failed."));
     return false;
   }
 
@@ -602,7 +560,7 @@ function renderParticipants() {
 
   const nameCounts = {};
   state.participants.forEach((participant) => {
-    const key = participant.name || "Onbekend";
+    const key = participant.name || "Unknown";
     nameCounts[key] = (nameCounts[key] || 0) + 1;
   });
 
@@ -615,14 +573,14 @@ function renderParticipants() {
     empty.innerHTML = `
       <div class="card not-voted"></div>
       <div class="avatar" style="background: #e2e8f0; color: #64748b;">?</div>
-      <span class="name">Wachten...</span>
+      <span class="name">Waiting...</span>
     `;
     els.participants.appendChild(empty);
     return;
   }
 
   state.participants.forEach((participant, index) => {
-    const name = participant.name || "Onbekend";
+    const name = participant.name || "Unknown";
     nameInstances[name] = (nameInstances[name] || 0) + 1;
     const suffix = nameCounts[name] > 1 ? ` (${nameInstances[name]})` : "";
     const displayName = `${name}${suffix}`;
@@ -680,11 +638,11 @@ function renderParticipants() {
 function renderStatus() {
   const total = state.participants.length;
   const voted = state.participants.filter((p) => state.votes.has(p.id)).length;
-  const revealLabel = state.revealed ? "Onthuld" : "Verborgen";
-  els.status.textContent = `${total} deelnemers, ${voted} gestemd · ${revealLabel}`;
+  const revealLabel = state.revealed ? "Revealed" : "Hidden";
+  els.status.textContent = `${total} participants, ${voted} voted · ${revealLabel}`;
 
   if (els.revealBtn) {
-    els.revealBtn.textContent = state.revealed ? "Verberg kaarten" : "Reveal kaarten";
+    els.revealBtn.textContent = state.revealed ? "Hide cards" : "Reveal cards";
   }
   els.revealBtn.disabled = !state.revealed && voted === 0;
   els.resetBtn.disabled = voted === 0 && !state.revealed;
@@ -729,7 +687,7 @@ async function ensureActiveSession() {
     .maybeSingle();
 
   if (error || !data) {
-    showError("Sessie niet gevonden.");
+    showError("Session not found.");
     setExpiredState(true);
     return false;
   }
@@ -760,6 +718,7 @@ function isExpired(lastActivity) {
 function showLandingView() {
   els.landing.classList.remove("hidden");
   els.session.classList.add("hidden");
+  els.session.classList.remove("join-mode");
 }
 
 function showSessionView() {
@@ -770,11 +729,13 @@ function showSessionView() {
 function showJoin() {
   els.join.classList.remove("hidden");
   els.table.classList.add("hidden");
+  els.session.classList.add("join-mode");
 }
 
 function showTable() {
   els.join.classList.add("hidden");
   els.table.classList.remove("hidden");
+  els.session.classList.remove("join-mode");
   render();
   if (!state.timerIntervalId) {
     setTimerDisplay(getSelectedDuration());
@@ -786,6 +747,7 @@ function setExpiredState(expired) {
     els.expired.classList.remove("hidden");
     els.join.classList.add("hidden");
     els.table.classList.add("hidden");
+    els.session.classList.remove("join-mode");
   } else {
     els.expired.classList.add("hidden");
   }
@@ -941,7 +903,7 @@ function isMissingTableError(error, table) {
 
 function getVotesErrorMessage(error, fallbackMessage) {
   if (isMissingTableError(error, "votes")) {
-    return "Votes tabel ontbreekt in Supabase. Draai supabase/schema.sql opnieuw.";
+    return "Votes table is missing in Supabase. Run supabase/schema.sql again.";
   }
   return fallbackMessage;
 }
@@ -978,7 +940,7 @@ function copyWithSelection(text) {
 
   if (!success) {
     try {
-      window.prompt("Kopieer de link:", text);
+      window.prompt("Copy the link:", text);
       success = true;
     } catch (error) {
       success = false;

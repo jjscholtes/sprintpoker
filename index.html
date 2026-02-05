@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
 
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Sprint Poker</title>
-  <meta name="description" content="Snel, simpel en realtime sprint planning poker voor agile teams." />
+  <meta name="description" content="Fast, simple, realtime sprint planning poker for agile teams." />
   <link rel="stylesheet" href="/styles.css" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
@@ -30,14 +30,14 @@
         <div class="landing-hero">
           <h1>Estimate together</h1>
           <p class="lead">
-            Maak een sessie, deel de link en begin direct met schatten.
-            Iedereen kan revealen en een nieuwe ronde starten.
+            Create a session, share the link, and start estimating right away.
+            Anyone can reveal cards and start a new round.
           </p>
           <div class="cta-row">
-            <button id="create-session" class="primary cta-large">Start nieuwe sessie</button>
-            <span class="cta-note">Geen account. Geen installaties.</span>
+            <button id="create-session" class="primary cta-large">Start new session</button>
+            <span class="cta-note">No accounts. No installs.</span>
           </div>
-          <p class="hint">Heb je een link? Plak die gewoon in je browser.</p>
+          <p class="hint">Already have a link? Paste it in your browser.</p>
         </div>
       </div>
     </section>
@@ -46,30 +46,30 @@
     <section id="session" class="panel hidden">
       <div class="session-header">
         <div class="session-title">
-          <div class="eyebrow">Sessie</div>
+          <div class="eyebrow">Session</div>
           <div class="session-meta">
             <span class="meta">ID: <span id="session-id">-</span></span>
           </div>
         </div>
-        <button id="copy-link" class="ghost copy-link-btn">📋 Kopieer link</button>
+        <button id="copy-link" class="ghost copy-link-btn">📋 Copy link</button>
       </div>
 
       <div id="expired" class="notice hidden">
         <div>
-          <strong>Sessie verlopen.</strong>
-          Deze sessie is langer dan 3 uur inactief geweest.
+          <strong>Session expired.</strong>
+          This session has been inactive for more than 3 hours.
         </div>
-        <button id="expired-create" class="primary">Nieuwe sessie</button>
+        <button id="expired-create" class="primary">New session</button>
       </div>
 
       <!-- Join -->
       <div id="join" class="join-card panel-card">
-        <h3>Doe mee</h3>
-        <p class="muted">Kies een emoji en vul je naam in</p>
+        <h3>Join</h3>
+        <p class="muted">Pick an emoji and enter your name</p>
         <form id="join-form">
           <div class="join-row">
-            <button type="button" id="emoji-picker-btn" class="emoji-picker-btn" title="Kies een emoji">🚀</button>
-            <input id="name-input" type="text" autocomplete="name" placeholder="Je naam" required />
+            <button type="button" id="emoji-picker-btn" class="emoji-picker-btn" title="Pick an emoji">🚀</button>
+            <input id="name-input" type="text" autocomplete="name" placeholder="Your name" required />
             <button type="submit" class="primary">Join</button>
           </div>
         </form>
@@ -95,10 +95,10 @@
             </div>
             <div class="actions">
               <button id="reveal-btn" class="primary">Reveal cards</button>
-              <button id="reset-btn" class="ghost">Nieuwe ronde</button>
+              <button id="reset-btn" class="ghost">New round</button>
             </div>
             <div class="scoreline">
-              <span class="label">Gem:</span>
+              <span class="label">Avg:</span>
               <strong id="average">-</strong>
             </div>
           </div>
@@ -116,7 +116,7 @@
         </div>
 
         <div class="card-section panel-card">
-          <div class="section-title">Kies een waarde</div>
+          <div class="section-title">Pick a value</div>
           <div id="card-grid" class="card-grid"></div>
         </div>
       </div>

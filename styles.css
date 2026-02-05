@@ -226,9 +226,9 @@ button:disabled {
 .landing-panel {
   text-align: center;
   padding: 88px 32px 72px;
-  border: 1px solid var(--border-subtle);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 .landing-grid {
@@ -247,6 +247,12 @@ button:disabled {
   align-items: center;
   gap: 10px;
   width: 100%;
+  max-width: 560px;
+  padding: 40px 34px;
+  border-radius: 22px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .landing-hero h1 {
@@ -270,6 +276,27 @@ button:disabled {
 }
 
 /* ===== SESSION VIEW ===== */
+#session.join-mode {
+  min-height: calc(100vh - 180px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#session.join-mode .session-header {
+  justify-content: center;
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+#session.join-mode .session-title {
+  text-align: center;
+}
+
+#session.join-mode .copy-link-btn {
+  margin: 0 auto;
+}
+
 .session-header {
   display: flex;
   justify-content: space-between;
@@ -795,6 +822,11 @@ button:disabled {
     min-height: auto;
   }
 
+  .landing-hero {
+    padding: 30px 22px;
+    border-radius: 18px;
+  }
+
   .table-surface {
     min-height: 300px;
     padding: 24px;
@@ -848,6 +880,10 @@ button:disabled {
 }
 
 @media (max-width: 480px) {
+  #session.join-mode {
+    min-height: calc(100vh - 140px);
+  }
+
   .app-header {
     flex-direction: column;
     align-items: flex-start;
