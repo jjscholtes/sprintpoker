@@ -368,6 +368,28 @@ button:disabled {
   margin: 0 auto;
 }
 
+#session.table-mode {
+  min-height: calc(100vh - 190px);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 22px;
+}
+
+#session.table-mode .session-header,
+#session.table-mode .table {
+  width: min(100%, 980px);
+  margin: 0;
+}
+
+#session.table-mode .table {
+  gap: 20px;
+}
+
+#session.table-mode .card-section {
+  width: 100%;
+}
+
 .session-header {
   display: flex;
   justify-content: space-between;
@@ -979,6 +1001,16 @@ button:disabled {
     max-width: none;
   }
 
+  #session.table-mode {
+    min-height: auto;
+    display: block;
+  }
+
+  #session.table-mode .session-header,
+  #session.table-mode .table {
+    width: 100%;
+  }
+
   .table-surface {
     min-height: 300px;
     padding: 24px;
@@ -1084,6 +1116,10 @@ button:disabled {
   #session.join-mode .join-card {
     width: 100%;
     padding: 22px 18px 20px;
+  }
+
+  #session.table-mode {
+    display: block;
   }
 
   .app-header {

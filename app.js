@@ -719,6 +719,7 @@ function showLandingView() {
   els.landing.classList.remove("hidden");
   els.session.classList.add("hidden");
   els.session.classList.remove("join-mode");
+  els.session.classList.remove("table-mode");
 }
 
 function showSessionView() {
@@ -730,12 +731,14 @@ function showJoin() {
   els.join.classList.remove("hidden");
   els.table.classList.add("hidden");
   els.session.classList.add("join-mode");
+  els.session.classList.remove("table-mode");
 }
 
 function showTable() {
   els.join.classList.add("hidden");
   els.table.classList.remove("hidden");
   els.session.classList.remove("join-mode");
+  els.session.classList.add("table-mode");
   render();
   if (!state.timerIntervalId) {
     setTimerDisplay(getSelectedDuration());
@@ -748,6 +751,7 @@ function setExpiredState(expired) {
     els.join.classList.add("hidden");
     els.table.classList.add("hidden");
     els.session.classList.remove("join-mode");
+    els.session.classList.remove("table-mode");
   } else {
     els.expired.classList.add("hidden");
   }
