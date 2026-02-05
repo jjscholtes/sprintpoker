@@ -217,27 +217,37 @@ function wireEvents() {
     if (!(await ensureActiveSession())) {
       return;
     }
-    if (state.session?.devils_advocate_active) {
-      showError("Wacht tot de Devil's Advocate timer voorbij is.");
-      return;
-    }
     const { error: deleteError } = await supabase
       .from("votes")
       .delete()
       .eq("session_id", state.sessionId);
-    if (deleteError) {
+    if (deleteError && !isMissingTableError(deleteError, "votes")) {
+      console.error("Votes delete failed:", deleteError);
+      showError(getVotesErrorMessage(deleteError, "Nieuwe ronde mislukt."));
+      return;
+    }
+    const now = new Date().toISOString();
+    const { error: updateError } = await supabase
+      .from("sessions")
+      .update({
+        revealed: false,
+        last_activity_at: now,
+        devils_advocate_active: false,
+        devils_advocate_participant_id: null,
+        devils_advocate_name: null,
+        devils_advocate_value: null,
+        devils_advocate_side: null,
+        devils_advocate_started_at: null,
+        devils_advocate_duration_sec: null,
+        deadlock_count: 0
+      })
+      .eq("id", state.sessionId);
+    if (updateError) {
+      console.error("Session reset failed:", updateError);
       showError("Nieuwe ronde mislukt.");
       return;
     }
     clearVotesState(false);
-    const now = new Date().toISOString();
-    const { error: updateError } = await supabase
-      .from("sessions")
-      .update({ revealed: false, last_activity_at: now })
-      .eq("id", state.sessionId);
-    if (updateError) {
-      showError("Nieuwe ronde mislukt.");
-    }
   });
 
   if (els.timerToggle) {
@@ -619,7 +629,7 @@ function renderStatus() {
 
   const devilsActive = Boolean(state.session?.devils_advocate_active);
   els.revealBtn.disabled = devilsActive || voted === 0 || state.revealed;
-  els.resetBtn.disabled = devilsActive || (voted === 0 && !state.revealed);
+  els.resetBtn.disabled = voted === 0 && !state.revealed;
 }
 
 function renderAverage() {
