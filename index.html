@@ -7,6 +7,7 @@
   <title>Sprint Poker</title>
   <meta name="description" content="Snel, simpel en realtime sprint planning poker voor agile teams." />
   <link rel="stylesheet" href="/styles.css" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 
 <body>
@@ -139,6 +140,12 @@
 
         <div class="card-section panel-card">
           <div class="section-title">Kies een waarde</div>
+          <div class="confidence-toggle-row">
+            <button id="confidence-toggle" class="ghost confidence-toggle" type="button" aria-pressed="false">
+              Confidence uit
+            </button>
+            <span class="confidence-note">Confidence is optioneel</span>
+          </div>
           <div id="card-grid" class="card-grid"></div>
           <div id="confidence-popover" class="confidence-popover hidden" aria-live="polite">
             <div class="confidence-top">

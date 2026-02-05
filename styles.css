@@ -818,6 +818,24 @@ button:disabled {
   box-shadow: 0 6px 16px rgba(59, 130, 246, 0.35);
 }
 
+/* Confidence toggle */
+.confidence-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.confidence-toggle {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.confidence-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* ===== CONFIDENCE METER ===== */
 .confidence-popover {
   position: absolute;

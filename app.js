@@ -22,6 +22,7 @@ const CONFIDENCE_LOW_THRESHOLD = 30;
 const DEADLOCK_GAP_THRESHOLD = 8;
 const DEADLOCK_MIN_SHARE = 0.4;
 const DEVILS_ADVOCATE_DURATION_SEC = 60;
+const CONFIDENCE_PREF_KEY = "sp_confidence_enabled";
 
 const els = {
   landing: document.getElementById("landing"),
@@ -48,6 +49,7 @@ const els = {
   confidenceValue: document.getElementById("confidence-value"),
   confidencePreview: document.getElementById("confidence-preview"),
   confidenceHint: document.getElementById("confidence-hint"),
+  confidenceToggle: document.getElementById("confidence-toggle"),
   revealBtn: document.getElementById("reveal-btn"),
   resetBtn: document.getElementById("reset-btn"),
   timerToggle: document.getElementById("timer-toggle"),
@@ -99,6 +101,7 @@ const state = {
   pendingVoteValue: null,
   pendingConfidence: null,
   selectedCardButton: null,
+  confidenceEnabled: false,
   devilsAdvocateTimerId: null,
   devilsAdvocateEndsAt: null
 };
@@ -111,6 +114,7 @@ async function init() {
   wireEvents();
   buildCardGrid();
   buildEmojiPicker();
+  loadConfidencePreference();
 
   const config = await loadConfig();
   if (!config?.SUPABASE_URL || !config?.SUPABASE_ANON_KEY) {
@@ -255,6 +259,9 @@ function wireEvents() {
       if (!els.confidenceRange) {
         return;
       }
+      if (!state.confidenceEnabled) {
+        return;
+      }
       const value = Number.parseInt(els.confidenceRange.value, 10);
       state.pendingConfidence = Number.isNaN(value) ? null : value;
       updateConfidenceUI();
@@ -262,6 +269,12 @@ function wireEvents() {
 
     els.confidenceRange.addEventListener("change", () => {
       void trySubmitPendingVote();
+    });
+  }
+
+  if (els.confidenceToggle) {
+    els.confidenceToggle.addEventListener("click", () => {
+      setConfidenceEnabled(!state.confidenceEnabled);
     });
   }
 
@@ -549,6 +562,14 @@ function handleCardSelection(value, button) {
   state.pendingVoteValue = value;
   state.selectedCardButton = button;
 
+  if (!state.confidenceEnabled) {
+    state.pendingConfidence = null;
+    hideConfidencePopover();
+    updateConfidenceUI();
+    void trySubmitPendingVote();
+    return;
+  }
+
   if (isNewSelection) {
     state.pendingConfidence = null;
     if (els.confidenceRange) {
@@ -616,8 +637,11 @@ function positionConfidencePopover(button) {
 
 function updateConfidenceUI() {
   if (els.confidenceValue) {
-    els.confidenceValue.textContent =
-      state.pendingConfidence === null ? "-" : state.pendingConfidence.toString();
+    const displayValue =
+      !state.confidenceEnabled || state.pendingConfidence === null
+        ? "-"
+        : state.pendingConfidence.toString();
+    els.confidenceValue.textContent = displayValue;
   }
   if (els.confidencePreview) {
     els.confidencePreview.textContent = state.pendingVoteValue ?? "-";
@@ -625,33 +649,42 @@ function updateConfidenceUI() {
 }
 
 async function trySubmitPendingVote() {
-  if (!state.pendingVoteValue || state.pendingConfidence === null) {
+  if (!state.pendingVoteValue) {
+    return;
+  }
+  const includeConfidence =
+    state.confidenceEnabled && state.pendingConfidence !== null;
+  if (state.confidenceEnabled && !includeConfidence) {
     return;
   }
   if (!state.participantId || isExpired(state.session?.last_activity_at)) {
     return;
   }
   const currentVote = state.votes.get(state.participantId);
-  if (
-    currentVote &&
-    currentVote.value === state.pendingVoteValue &&
-    Number(currentVote.confidence) === state.pendingConfidence
-  ) {
+  const sameValue = currentVote && currentVote.value === state.pendingVoteValue;
+  const sameConfidence = includeConfidence
+    ? Number(currentVote?.confidence) === state.pendingConfidence
+    : true;
+  if (sameValue && sameConfidence) {
     if (els.confidenceHint) {
       els.confidenceHint.textContent = "Stem opgeslagen";
     }
     return;
   }
 
-  const success = await submitVote(state.pendingVoteValue, state.pendingConfidence);
+  const success = await submitVote(
+    state.pendingVoteValue,
+    state.pendingConfidence,
+    includeConfidence
+  );
   if (success && els.confidenceHint) {
     els.confidenceHint.textContent = "Stem opgeslagen";
   }
 }
 
-async function submitVote(value, confidence) {
+async function submitVote(value, confidence, includeConfidence = true) {
   const now = new Date().toISOString();
-  const error = await writeVote(value, confidence);
+  const error = await writeVote(value, confidence, includeConfidence);
   if (error) {
     showError("Stemmen mislukt.");
     return false;
@@ -665,8 +698,7 @@ async function submitVote(value, confidence) {
   return true;
 }
 
-async function writeVote(value, confidence) {
-  let includeConfidence = true;
+async function writeVote(value, confidence, includeConfidence) {
   let error = await tryUpsertVote(value, confidence, includeConfidence);
   if (error && isMissingColumnError(error, "confidence")) {
     includeConfidence = false;
@@ -771,6 +803,37 @@ function clearVotesState(nextRevealed) {
     state.revealed = nextRevealed;
   }
   render();
+}
+
+function loadConfidencePreference() {
+  const stored = localStorage.getItem(CONFIDENCE_PREF_KEY);
+  if (stored === null) {
+    setConfidenceEnabled(false, { persist: false });
+    return;
+  }
+  setConfidenceEnabled(stored === "true", { persist: false });
+}
+
+function setConfidenceEnabled(enabled, { persist = true } = {}) {
+  state.confidenceEnabled = enabled;
+  if (els.confidenceToggle) {
+    els.confidenceToggle.textContent = enabled ? "Confidence aan" : "Confidence uit";
+    els.confidenceToggle.setAttribute("aria-pressed", String(enabled));
+  }
+  if (!enabled) {
+    hideConfidencePopover();
+    state.pendingConfidence = null;
+    if (els.confidenceRange) {
+      els.confidenceRange.value = CONFIDENCE_DEFAULT.toString();
+    }
+    if (els.confidenceHint) {
+      els.confidenceHint.textContent = "Sleep om te bevestigen";
+    }
+  }
+  updateConfidenceUI();
+  if (persist) {
+    localStorage.setItem(CONFIDENCE_PREF_KEY, String(enabled));
+  }
 }
 
 function renderParticipants() {
