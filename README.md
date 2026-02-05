@@ -11,9 +11,7 @@ A lightweight, real-time planning poker app for agile teams. Create a session, s
 
 **Main features**
 - Real-time updates via Supabase Realtime (votes + session state).
-- Optional confidence slider that annotates votes (visualized by clarity/opacity).
 - Round timer (1-5 minutes) with a visible countdown.
-- Deadlock helper ("Devil's Advocate") that kicks in after repeated split votes and prompts a short re-discussion.
 - Session expiry after 3 hours of inactivity (client-side check + server time sync).
 
 ## Setup
@@ -52,7 +50,7 @@ Open `http://localhost:8000`.
 ## Notes
 - The Supabase keys are public client keys; do not put secrets in the frontend.
 - The app calls `/api/config` in production to expose only the public keys.
-- If you previously ran the schema, re-run `supabase/schema.sql` to ensure `server_time()` and confidence columns exist.
+- If you previously ran the schema, re-run `supabase/schema.sql` to ensure `server_time()` exists.
 
 ## License
 MIT

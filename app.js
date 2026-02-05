@@ -17,9 +17,6 @@ const CARD_VALUES = [
   "?",
   "☕"
 ];
-const DEADLOCK_GAP_THRESHOLD = 8;
-const DEADLOCK_MIN_SHARE = 0.4;
-const DEVILS_ADVOCATE_DURATION_SEC = 60;
 
 const els = {
   landing: document.getElementById("landing"),
@@ -39,7 +36,6 @@ const els = {
   status: document.getElementById("status"),
   average: document.getElementById("average"),
   participants: document.getElementById("participants"),
-  cardSection: document.querySelector(".card-section"),
   cardGrid: document.getElementById("card-grid"),
   revealBtn: document.getElementById("reveal-btn"),
   resetBtn: document.getElementById("reset-btn"),
@@ -49,9 +45,6 @@ const els = {
   timerCircle: document.getElementById("timer-circle"),
   timerProgress: document.getElementById("timer-progress"),
   timerText: document.getElementById("timer-text"),
-  devilsAdvocate: document.getElementById("devils-advocate"),
-  devilsAdvocateMessage: document.getElementById("devils-advocate-message"),
-  devilsAdvocateTime: document.getElementById("devils-advocate-time"),
   error: document.getElementById("global-error")
 };
 
@@ -88,9 +81,7 @@ const state = {
   serverOffsetMs: 0,
   lastServerSyncAt: 0,
   timerIntervalId: null,
-  timerEndsAt: null,
-  devilsAdvocateTimerId: null,
-  devilsAdvocateEndsAt: null
+  timerEndsAt: null
 };
 
 let supabase = null;
@@ -193,10 +184,6 @@ function wireEvents() {
     if (!(await ensureActiveSession())) {
       return;
     }
-    if (state.session?.devils_advocate_active) {
-      showError("Wacht tot de Devil's Advocate timer voorbij is.");
-      return;
-    }
     const now = new Date().toISOString();
     const { error } = await supabase
       .from("sessions")
@@ -208,7 +195,6 @@ function wireEvents() {
     }
     const refreshed = await refreshVotes();
     if (refreshed) {
-      await evaluateDeadlockAfterReveal();
     }
   });
 
@@ -229,18 +215,7 @@ function wireEvents() {
     const now = new Date().toISOString();
     const { error: updateError } = await supabase
       .from("sessions")
-      .update({
-        revealed: false,
-        last_activity_at: now,
-        devils_advocate_active: false,
-        devils_advocate_participant_id: null,
-        devils_advocate_name: null,
-        devils_advocate_value: null,
-        devils_advocate_side: null,
-        devils_advocate_started_at: null,
-        devils_advocate_duration_sec: null,
-        deadlock_count: 0
-      })
+      .update({ revealed: false, last_activity_at: now })
       .eq("id", state.sessionId);
     if (updateError) {
       console.error("Session reset failed:", updateError);
@@ -423,7 +398,7 @@ async function refreshVotes() {
     .eq("session_id", state.sessionId);
   if (error) {
     console.error("Votes fetch failed:", error);
-    showError("Votes ophalen mislukt.");
+    showError(getVotesErrorMessage(error, "Votes ophalen mislukt."));
     return false;
   }
   state.votes = new Map(data.map((vote) => [vote.participant_id, vote.value]));
@@ -444,7 +419,7 @@ function buildCardGrid() {
       if (!(await ensureActiveSession())) {
         return;
       }
-      handleCardSelection(value, button);
+      handleCardSelection(value);
     });
     els.cardGrid.appendChild(button);
   });
@@ -486,7 +461,6 @@ function buildEmojiPicker() {
 }
 
 async function handleCardSelection(value) {
-  renderCards();
   await submitVote(value);
 }
 
@@ -503,8 +477,13 @@ async function submitVote(value) {
 
   if (error) {
     console.error("Vote upsert failed:", error);
-    showError("Stemmen mislukt.");
+    showError(getVotesErrorMessage(error, "Stemmen mislukt."));
     return false;
+  }
+
+  if (state.participantId) {
+    state.votes.set(state.participantId, value);
+    render();
   }
 
   await supabase
@@ -528,7 +507,6 @@ function render() {
   renderStatus();
   renderAverage();
   renderCards();
-  renderDevilsAdvocate();
 }
 
 function clearVotesState(nextRevealed) {
@@ -627,8 +605,7 @@ function renderStatus() {
   const revealLabel = state.revealed ? "Onthuld" : "Verborgen";
   els.status.textContent = `${total} deelnemers, ${voted} gestemd · ${revealLabel}`;
 
-  const devilsActive = Boolean(state.session?.devils_advocate_active);
-  els.revealBtn.disabled = devilsActive || voted === 0 || state.revealed;
+  els.revealBtn.disabled = voted === 0 || state.revealed;
   els.resetBtn.disabled = voted === 0 && !state.revealed;
 }
 
@@ -653,9 +630,7 @@ function renderAverage() {
 function renderCards() {
   const myVote = state.votes.get(state.participantId);
   const disabled =
-    !state.participantId ||
-    isExpired(state.session?.last_activity_at) ||
-    state.session?.devils_advocate_active;
+    !state.participantId || isExpired(state.session?.last_activity_at);
   const buttons = els.cardGrid.querySelectorAll(".card-button");
   buttons.forEach((button) => {
     button.classList.toggle("selected", button.textContent === myVote);
@@ -663,213 +638,6 @@ function renderCards() {
   });
 }
 
-function detectDeadlock(votesMap) {
-  const numericVotes = [];
-  votesMap.forEach((value) => {
-    const numeric = Number.parseFloat(value);
-    if (!Number.isNaN(numeric)) {
-      numericVotes.push(numeric);
-    }
-  });
-
-  if (numericVotes.length < 2) {
-    return { isDeadlock: false };
-  }
-
-  const min = Math.min(...numericVotes);
-  const max = Math.max(...numericVotes);
-  if (min === max || max - min < DEADLOCK_GAP_THRESHOLD) {
-    return { isDeadlock: false };
-  }
-
-  const total = numericVotes.length;
-  const minCount = numericVotes.filter((value) => value === min).length;
-  const maxCount = numericVotes.filter((value) => value === max).length;
-  if (minCount / total < DEADLOCK_MIN_SHARE || maxCount / total < DEADLOCK_MIN_SHARE) {
-    return { isDeadlock: false };
-  }
-
-  return { isDeadlock: true, min, max };
-}
-
-async function evaluateDeadlockAfterReveal() {
-  if (state.session?.devils_advocate_active) {
-    return;
-  }
-  const deadlock = detectDeadlock(state.votes);
-  const currentCount = Number(state.session?.deadlock_count) || 0;
-
-  if (!deadlock.isDeadlock) {
-    if (currentCount !== 0) {
-      await updateDeadlockCount(0);
-    }
-    return;
-  }
-
-  const nextCount = Math.min(2, currentCount + 1);
-  if (nextCount < 2) {
-    await updateDeadlockCount(nextCount);
-    return;
-  }
-
-  await triggerDevilsAdvocate(deadlock);
-}
-
-async function updateDeadlockCount(count) {
-  const { error } = await supabase
-    .from("sessions")
-    .update({ deadlock_count: count })
-    .eq("id", state.sessionId);
-  if (!error && state.session) {
-    state.session.deadlock_count = count;
-  }
-}
-
-async function triggerDevilsAdvocate(deadlock) {
-  const candidate = pickAdvocateCandidate();
-  if (!candidate) {
-    await updateDeadlockCount(1);
-    return;
-  }
-
-  const side = Math.random() < 0.5 ? "low" : "high";
-  const value = side === "low" ? deadlock.min : deadlock.max;
-  const now = new Date().toISOString();
-
-  const { data, error } = await supabase
-    .from("sessions")
-    .update({
-      devils_advocate_active: true,
-      devils_advocate_participant_id: candidate.id,
-      devils_advocate_name: candidate.name || "Onbekend",
-      devils_advocate_value: value.toString(),
-      devils_advocate_side: side,
-      devils_advocate_started_at: now,
-      devils_advocate_duration_sec: DEVILS_ADVOCATE_DURATION_SEC,
-      deadlock_count: 0,
-      last_activity_at: now
-    })
-    .eq("id", state.sessionId)
-    .eq("devils_advocate_active", false)
-    .select();
-
-  if (error) {
-    showError("Devil's Advocate starten mislukt.");
-    return;
-  }
-
-  if (!data || data.length === 0) {
-    return;
-  }
-}
-
-function pickAdvocateCandidate() {
-  const voters = state.participants.filter((participant) =>
-    state.votes.has(participant.id)
-  );
-  if (voters.length === 0) {
-    return null;
-  }
-  const index = randomIndex(voters.length);
-  return voters[index];
-}
-
-function renderDevilsAdvocate() {
-  if (!els.devilsAdvocate || !els.devilsAdvocateMessage || !els.devilsAdvocateTime) {
-    return;
-  }
-
-  const active = Boolean(state.session?.devils_advocate_active);
-  els.devilsAdvocate.classList.toggle("hidden", !active);
-
-  if (!active) {
-    stopDevilsAdvocateTimer();
-    return;
-  }
-
-  hideConfidencePopover();
-
-  const name = state.session?.devils_advocate_name || "Iemand";
-  const value = state.session?.devils_advocate_value || "?";
-  const side = state.session?.devils_advocate_side || "low";
-  const isYou = state.session?.devils_advocate_participant_id === state.participantId;
-  const prompt =
-    side === "high"
-      ? "Vertel ons waarom dit project ons hele weekend gaat kosten."
-      : "Vertel ons waarom dit eigenlijk heel simpel is.";
-  const subject = isYou ? "Jij bent" : `${name} is`;
-  els.devilsAdvocateMessage.textContent = `${subject} nu de advocaat van de ${value}. ${prompt}`;
-
-  ensureDevilsAdvocateTimer();
-}
-
-function ensureDevilsAdvocateTimer() {
-  if (!state.session?.devils_advocate_started_at) {
-    return;
-  }
-  const duration =
-    Number(state.session?.devils_advocate_duration_sec) || DEVILS_ADVOCATE_DURATION_SEC;
-  const startMs = new Date(state.session.devils_advocate_started_at).getTime();
-  if (Number.isNaN(startMs)) {
-    return;
-  }
-  const endsAt = startMs + duration * 1000;
-  if (state.devilsAdvocateEndsAt !== endsAt) {
-    state.devilsAdvocateEndsAt = endsAt;
-    if (state.devilsAdvocateTimerId) {
-      window.clearInterval(state.devilsAdvocateTimerId);
-    }
-    state.devilsAdvocateTimerId = window.setInterval(() => {
-      updateDevilsAdvocateTimer();
-    }, 250);
-  }
-  updateDevilsAdvocateTimer();
-}
-
-function updateDevilsAdvocateTimer() {
-  if (!state.devilsAdvocateEndsAt || !els.devilsAdvocateTime) {
-    return;
-  }
-  const remainingMs = state.devilsAdvocateEndsAt - getNowMs();
-  const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
-  els.devilsAdvocateTime.textContent = formatSeconds(remainingSec);
-  if (remainingSec <= 0) {
-    stopDevilsAdvocateTimer();
-    void endDevilsAdvocateRound();
-  }
-}
-
-function stopDevilsAdvocateTimer() {
-  if (state.devilsAdvocateTimerId) {
-    window.clearInterval(state.devilsAdvocateTimerId);
-  }
-  state.devilsAdvocateTimerId = null;
-  state.devilsAdvocateEndsAt = null;
-}
-
-async function endDevilsAdvocateRound() {
-  if (!state.session?.devils_advocate_active) {
-    return;
-  }
-  const now = new Date().toISOString();
-  await supabase.from("votes").delete().eq("session_id", state.sessionId);
-  await supabase
-    .from("sessions")
-    .update({
-      revealed: false,
-      last_activity_at: now,
-      devils_advocate_active: false,
-      devils_advocate_participant_id: null,
-      devils_advocate_name: null,
-      devils_advocate_value: null,
-      devils_advocate_side: null,
-      devils_advocate_started_at: null,
-      devils_advocate_duration_sec: null,
-      deadlock_count: 0
-    })
-    .eq("id", state.sessionId)
-    .eq("devils_advocate_active", true);
-}
 
 async function ensureActiveSession() {
   await syncServerTime();
@@ -937,10 +705,6 @@ function setExpiredState(expired) {
     els.expired.classList.remove("hidden");
     els.join.classList.add("hidden");
     els.table.classList.add("hidden");
-    if (els.devilsAdvocate) {
-      els.devilsAdvocate.classList.add("hidden");
-    }
-    stopDevilsAdvocateTimer();
   } else {
     els.expired.classList.add("hidden");
   }
@@ -1094,16 +858,11 @@ function isMissingTableError(error, table) {
   ) && text.includes("does not exist");
 }
 
-function randomIndex(max) {
-  if (max <= 1) {
-    return 0;
+function getVotesErrorMessage(error, fallbackMessage) {
+  if (isMissingTableError(error, "votes")) {
+    return "Votes tabel ontbreekt in Supabase. Draai supabase/schema.sql opnieuw.";
   }
-  if (crypto?.getRandomValues) {
-    const array = new Uint32Array(1);
-    crypto.getRandomValues(array);
-    return array[0] % max;
-  }
-  return Math.floor(Math.random() * max);
+  return fallbackMessage;
 }
 
 async function copyToClipboard(text) {

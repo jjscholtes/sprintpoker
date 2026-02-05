@@ -4,15 +4,7 @@ create table if not exists public.sessions (
   id text primary key,
   created_at timestamptz not null default now(),
   last_activity_at timestamptz not null default now(),
-  revealed boolean not null default false,
-  deadlock_count smallint not null default 0,
-  devils_advocate_active boolean not null default false,
-  devils_advocate_participant_id text,
-  devils_advocate_name text,
-  devils_advocate_value text,
-  devils_advocate_side text,
-  devils_advocate_started_at timestamptz,
-  devils_advocate_duration_sec integer
+  revealed boolean not null default false
 );
 
 create table if not exists public.votes (
@@ -20,33 +12,12 @@ create table if not exists public.votes (
   session_id text not null references public.sessions(id) on delete cascade,
   participant_id text not null,
   value text not null,
-  confidence smallint not null default 50,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (session_id, participant_id)
 );
 
 create index if not exists votes_session_id_idx on public.votes(session_id);
-
-alter table public.sessions
-  add column if not exists deadlock_count smallint not null default 0;
-alter table public.sessions
-  add column if not exists devils_advocate_active boolean not null default false;
-alter table public.sessions
-  add column if not exists devils_advocate_participant_id text;
-alter table public.sessions
-  add column if not exists devils_advocate_name text;
-alter table public.sessions
-  add column if not exists devils_advocate_value text;
-alter table public.sessions
-  add column if not exists devils_advocate_side text;
-alter table public.sessions
-  add column if not exists devils_advocate_started_at timestamptz;
-alter table public.sessions
-  add column if not exists devils_advocate_duration_sec integer;
-
-alter table public.votes
-  add column if not exists confidence smallint not null default 50;
 
 create or replace function public.set_updated_at()
 returns trigger as $$
