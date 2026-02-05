@@ -781,10 +781,10 @@ function renderParticipants() {
     `;
 
     // Keep the old vote span for compatibility
-    const vote = document.createElement("span");
-    vote.className = "vote";
-    vote.style.display = "none";
-    li.appendChild(vote);
+    const voteEl = document.createElement("span");
+    voteEl.className = "vote";
+    voteEl.style.display = "none";
+    li.appendChild(voteEl);
 
     els.participants.appendChild(li);
   });
