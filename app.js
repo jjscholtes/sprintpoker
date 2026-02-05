@@ -17,12 +17,9 @@ const CARD_VALUES = [
   "?",
   "☕"
 ];
-const CONFIDENCE_DEFAULT = 50;
-const CONFIDENCE_LOW_THRESHOLD = 30;
 const DEADLOCK_GAP_THRESHOLD = 8;
 const DEADLOCK_MIN_SHARE = 0.4;
 const DEVILS_ADVOCATE_DURATION_SEC = 60;
-const CONFIDENCE_PREF_KEY = "sp_confidence_enabled";
 
 const els = {
   landing: document.getElementById("landing"),
@@ -44,12 +41,6 @@ const els = {
   participants: document.getElementById("participants"),
   cardSection: document.querySelector(".card-section"),
   cardGrid: document.getElementById("card-grid"),
-  confidencePopover: document.getElementById("confidence-popover"),
-  confidenceRange: document.getElementById("confidence-range"),
-  confidenceValue: document.getElementById("confidence-value"),
-  confidencePreview: document.getElementById("confidence-preview"),
-  confidenceHint: document.getElementById("confidence-hint"),
-  confidenceToggle: document.getElementById("confidence-toggle"),
   revealBtn: document.getElementById("reveal-btn"),
   resetBtn: document.getElementById("reset-btn"),
   timerToggle: document.getElementById("timer-toggle"),
@@ -98,10 +89,6 @@ const state = {
   lastServerSyncAt: 0,
   timerIntervalId: null,
   timerEndsAt: null,
-  pendingVoteValue: null,
-  pendingConfidence: null,
-  selectedCardButton: null,
-  confidenceEnabled: false,
   devilsAdvocateTimerId: null,
   devilsAdvocateEndsAt: null
 };
@@ -114,7 +101,6 @@ async function init() {
   wireEvents();
   buildCardGrid();
   buildEmojiPicker();
-  loadConfidencePreference();
 
   const config = await loadConfig();
   if (!config?.SUPABASE_URL || !config?.SUPABASE_ANON_KEY) {
@@ -251,50 +237,6 @@ function wireEvents() {
       .eq("id", state.sessionId);
     if (updateError) {
       showError("Nieuwe ronde mislukt.");
-    }
-  });
-
-  if (els.confidenceRange) {
-    els.confidenceRange.addEventListener("input", () => {
-      if (!els.confidenceRange) {
-        return;
-      }
-      if (!state.confidenceEnabled) {
-        return;
-      }
-      const value = Number.parseInt(els.confidenceRange.value, 10);
-      state.pendingConfidence = Number.isNaN(value) ? null : value;
-      updateConfidenceUI();
-    });
-
-    els.confidenceRange.addEventListener("change", () => {
-      void trySubmitPendingVote();
-    });
-  }
-
-  if (els.confidenceToggle) {
-    els.confidenceToggle.addEventListener("click", () => {
-      setConfidenceEnabled(!state.confidenceEnabled);
-    });
-  }
-
-  document.addEventListener("click", (event) => {
-    if (!els.confidencePopover || !els.cardGrid) {
-      return;
-    }
-    const target = event.target;
-    if (
-      target instanceof Element &&
-      !els.confidencePopover.contains(target) &&
-      !els.cardGrid.contains(target)
-    ) {
-      hideConfidencePopover();
-    }
-  });
-
-  window.addEventListener("resize", () => {
-    if (state.selectedCardButton && !isConfidencePopoverHidden()) {
-      positionConfidencePopover(state.selectedCardButton);
     }
   });
 
@@ -465,41 +407,16 @@ function updatePresence() {
 }
 
 async function refreshVotes() {
-  let { data, error } = await supabase
+  const { data, error } = await supabase
     .from("votes")
-    .select("participant_id,value,confidence")
+    .select("participant_id,value")
     .eq("session_id", state.sessionId);
-  if (error && isMissingColumnError(error, "confidence")) {
-    ({ data, error } = await supabase
-      .from("votes")
-      .select("participant_id,value")
-      .eq("session_id", state.sessionId));
-  }
   if (error) {
     console.error("Votes fetch failed:", error);
-    showError(getVotesErrorMessage(error, "Votes ophalen mislukt."));
+    showError("Votes ophalen mislukt.");
     return false;
   }
-  state.votes = new Map(
-    data.map((vote) => [
-      vote.participant_id,
-      { value: vote.value, confidence: vote.confidence }
-    ])
-  );
-
-  const myVote = state.votes.get(state.participantId);
-  const isSelecting = state.pendingVoteValue && state.pendingConfidence === null;
-  if (myVote && !isSelecting) {
-    state.pendingVoteValue = myVote.value;
-    state.pendingConfidence =
-      myVote.confidence === null || Number.isNaN(Number(myVote.confidence))
-        ? CONFIDENCE_DEFAULT
-        : Number(myVote.confidence);
-    if (els.confidenceRange) {
-      els.confidenceRange.value = state.pendingConfidence.toString();
-    }
-    updateConfidenceUI();
-  }
+  state.votes = new Map(data.map((vote) => [vote.participant_id, vote.value]));
   render();
   return true;
 }
@@ -558,141 +475,25 @@ function buildEmojiPicker() {
   });
 }
 
-function handleCardSelection(value, button) {
-  const isNewSelection = state.pendingVoteValue !== value;
-  state.pendingVoteValue = value;
-  state.selectedCardButton = button;
-
-  if (!state.confidenceEnabled) {
-    state.pendingConfidence = null;
-    hideConfidencePopover();
-    updateConfidenceUI();
-    renderCards();
-    void trySubmitPendingVote();
-    return;
-  }
-
-  if (isNewSelection) {
-    state.pendingConfidence = null;
-    if (els.confidenceRange) {
-      els.confidenceRange.value = CONFIDENCE_DEFAULT.toString();
-    }
-    if (els.confidenceHint) {
-      els.confidenceHint.textContent = "Sleep om te bevestigen";
-    }
-  }
-
-  if (els.confidencePreview) {
-    els.confidencePreview.textContent = value;
-  }
-
-  showConfidencePopover(button);
-  updateConfidenceUI();
+async function handleCardSelection(value) {
   renderCards();
+  await submitVote(value);
 }
 
-function showConfidencePopover(button) {
-  if (!els.confidencePopover || !els.cardSection) {
-    return;
-  }
-  if (!state.confidenceEnabled) {
-    return;
-  }
-  els.confidencePopover.classList.remove("hidden");
-  positionConfidencePopover(button);
-}
-
-function hideConfidencePopover() {
-  if (!els.confidencePopover) {
-    return;
-  }
-  els.confidencePopover.classList.add("hidden");
-}
-
-function isConfidencePopoverHidden() {
-  return !els.confidencePopover || els.confidencePopover.classList.contains("hidden");
-}
-
-function positionConfidencePopover(button) {
-  if (!els.confidencePopover || !els.cardSection) {
-    return;
-  }
-  const sectionRect = els.cardSection.getBoundingClientRect();
-  const buttonRect = button.getBoundingClientRect();
-  const popover = els.confidencePopover;
-  const popRect = popover.getBoundingClientRect();
-
-  let left = buttonRect.right - sectionRect.left + 12;
-  let top =
-    buttonRect.top -
-    sectionRect.top +
-    buttonRect.height / 2 -
-    popRect.height / 2;
-
-  if (left + popRect.width > sectionRect.width) {
-    left = buttonRect.left - sectionRect.left - popRect.width - 12;
-  }
-
-  left = clamp(left, 8, sectionRect.width - popRect.width - 8);
-  top = clamp(top, 8, sectionRect.height - popRect.height - 8);
-
-  popover.style.left = `${left}px`;
-  popover.style.top = `${top}px`;
-}
-
-function updateConfidenceUI() {
-  if (els.confidenceValue) {
-    const displayValue =
-      !state.confidenceEnabled || state.pendingConfidence === null
-        ? "-"
-        : state.pendingConfidence.toString();
-    els.confidenceValue.textContent = displayValue;
-  }
-  if (els.confidencePreview) {
-    els.confidencePreview.textContent = state.pendingVoteValue ?? "-";
-  }
-}
-
-async function trySubmitPendingVote() {
-  if (!state.pendingVoteValue) {
-    return;
-  }
-  const includeConfidence =
-    state.confidenceEnabled && state.pendingConfidence !== null;
-  if (state.confidenceEnabled && !includeConfidence) {
-    return;
-  }
-  if (!state.participantId || isExpired(state.session?.last_activity_at)) {
-    return;
-  }
-  const currentVote = state.votes.get(state.participantId);
-  const sameValue = currentVote && currentVote.value === state.pendingVoteValue;
-  const sameConfidence = includeConfidence
-    ? Number(currentVote?.confidence) === state.pendingConfidence
-    : true;
-  if (sameValue && sameConfidence) {
-    if (els.confidenceHint) {
-      els.confidenceHint.textContent = "Stem opgeslagen";
-    }
-    return;
-  }
-
-  const success = await submitVote(
-    state.pendingVoteValue,
-    state.pendingConfidence,
-    includeConfidence
-  );
-  if (success && els.confidenceHint) {
-    els.confidenceHint.textContent = "Stem opgeslagen";
-  }
-}
-
-async function submitVote(value, confidence, includeConfidence = true) {
+async function submitVote(value) {
   const now = new Date().toISOString();
-  const error = await writeVote(value, confidence, includeConfidence);
+  const { error } = await supabase.from("votes").upsert(
+    {
+      session_id: state.sessionId,
+      participant_id: state.participantId,
+      value
+    },
+    { onConflict: "session_id,participant_id" }
+  );
+
   if (error) {
     console.error("Vote upsert failed:", error);
-    showError(getVotesErrorMessage(error, "Stemmen mislukt."));
+    showError("Stemmen mislukt.");
     return false;
   }
 
@@ -702,78 +503,6 @@ async function submitVote(value, confidence, includeConfidence = true) {
     .eq("id", state.sessionId);
 
   return true;
-}
-
-async function writeVote(value, confidence, includeConfidence) {
-  let error = await tryUpsertVote(value, confidence, includeConfidence);
-  if (error && isMissingColumnError(error, "confidence")) {
-    includeConfidence = false;
-    error = await tryUpsertVote(value, confidence, includeConfidence);
-  }
-  if (error && isOnConflictError(error)) {
-    error = await updateThenInsertVote(value, confidence, includeConfidence);
-    if (error && includeConfidence && isMissingColumnError(error, "confidence")) {
-      includeConfidence = false;
-      error = await updateThenInsertVote(value, confidence, includeConfidence);
-    }
-  }
-  return error;
-}
-
-async function tryUpsertVote(value, confidence, includeConfidence) {
-  const payload = buildVotePayload(value, confidence, includeConfidence);
-  const { error } = await supabase.from("votes").upsert(payload, {
-    onConflict: "session_id,participant_id"
-  });
-  return error;
-}
-
-async function updateThenInsertVote(value, confidence, includeConfidence) {
-  const updatePayload = buildVoteUpdatePayload(value, confidence, includeConfidence);
-  let { data, error } = await supabase
-    .from("votes")
-    .update(updatePayload)
-    .eq("session_id", state.sessionId)
-    .eq("participant_id", state.participantId)
-    .select("id");
-
-  if (error) {
-    return error;
-  }
-  if (Array.isArray(data) && data.length > 0) {
-    return null;
-  }
-
-  const insertPayload = buildVotePayload(value, confidence, includeConfidence);
-  ({ error } = await supabase.from("votes").insert(insertPayload));
-  if (error && isDuplicateKeyError(error)) {
-    ({ error } = await supabase
-      .from("votes")
-      .update(updatePayload)
-      .eq("session_id", state.sessionId)
-      .eq("participant_id", state.participantId));
-  }
-  return error;
-}
-
-function buildVotePayload(value, confidence, includeConfidence) {
-  const payload = {
-    session_id: state.sessionId,
-    participant_id: state.participantId,
-    value
-  };
-  if (includeConfidence) {
-    payload.confidence = confidence;
-  }
-  return payload;
-}
-
-function buildVoteUpdatePayload(value, confidence, includeConfidence) {
-  const payload = { value };
-  if (includeConfidence) {
-    payload.confidence = confidence;
-  }
-  return payload;
 }
 
 async function touchSession() {
@@ -794,55 +523,10 @@ function render() {
 
 function clearVotesState(nextRevealed) {
   state.votes = new Map();
-  state.pendingVoteValue = null;
-  state.pendingConfidence = null;
-  state.selectedCardButton = null;
-  if (els.confidenceRange) {
-    els.confidenceRange.value = CONFIDENCE_DEFAULT.toString();
-  }
-  if (els.confidenceHint) {
-    els.confidenceHint.textContent = "Sleep om te bevestigen";
-  }
-  updateConfidenceUI();
-  hideConfidencePopover();
   if (typeof nextRevealed === "boolean") {
     state.revealed = nextRevealed;
   }
   render();
-}
-
-function loadConfidencePreference() {
-  const stored = localStorage.getItem(CONFIDENCE_PREF_KEY);
-  if (stored === null) {
-    setConfidenceEnabled(false, { persist: false });
-    return;
-  }
-  setConfidenceEnabled(stored === "true", { persist: false });
-}
-
-function setConfidenceEnabled(enabled, { persist = true } = {}) {
-  state.confidenceEnabled = enabled;
-  if (els.confidenceToggle) {
-    els.confidenceToggle.textContent = enabled ? "Confidence aan" : "Confidence uit";
-    els.confidenceToggle.setAttribute("aria-pressed", String(enabled));
-  }
-  if (els.confidenceRange) {
-    els.confidenceRange.disabled = !enabled;
-  }
-  if (!enabled) {
-    hideConfidencePopover();
-    state.pendingConfidence = null;
-    if (els.confidenceRange) {
-      els.confidenceRange.value = CONFIDENCE_DEFAULT.toString();
-    }
-    if (els.confidenceHint) {
-      els.confidenceHint.textContent = "Sleep om te bevestigen";
-    }
-  }
-  updateConfidenceUI();
-  if (persist) {
-    localStorage.setItem(CONFIDENCE_PREF_KEY, String(enabled));
-  }
 }
 
 function renderParticipants() {
@@ -882,10 +566,8 @@ function renderParticipants() {
       li.classList.add("me");
     }
 
-    const vote = state.votes.get(participant.id);
-    const hasVoted = Boolean(vote);
-    const voteValue = vote?.value;
-    const confidence = normalizeConfidence(vote?.confidence);
+    const voteValue = state.votes.get(participant.id);
+    const hasVoted = voteValue !== undefined;
 
     // Get initials for avatar
     const initials = name
@@ -902,12 +584,9 @@ function renderParticipants() {
     // Determine card state
     let cardClass = "card ";
     let cardContent = "";
-    let cardStyle = "";
     if (state.revealed && hasVoted) {
       cardClass += "revealed";
       cardContent = voteValue;
-      const visuals = getConfidenceVisuals(confidence);
-      cardStyle = ` style="opacity:${visuals.opacity}; filter: blur(${visuals.blur}px) saturate(${visuals.saturation});"`;
     } else if (hasVoted) {
       cardClass += "voted-hidden";
       cardContent = "";
@@ -917,7 +596,7 @@ function renderParticipants() {
     }
 
     li.innerHTML = `
-      <div class="${cardClass}"${cardStyle}>${cardContent}</div>
+      <div class="${cardClass}">${cardContent}</div>
       <div class="${avatarClass}" style="background: ${avatarColor}">${avatarContent}</div>
       <span class="name">${displayName}</span>
     `;
@@ -949,7 +628,7 @@ function renderAverage() {
     return;
   }
   const numericVotes = [...state.votes.values()]
-    .map((vote) => Number.parseFloat(vote.value))
+    .map((value) => Number.parseFloat(value))
     .filter((value) => !Number.isNaN(value));
   if (numericVotes.length === 0) {
     els.average.textContent = "N/A";
@@ -962,8 +641,7 @@ function renderAverage() {
 }
 
 function renderCards() {
-  const storedVote = state.votes.get(state.participantId);
-  const myVote = state.pendingVoteValue ?? storedVote?.value;
+  const myVote = state.votes.get(state.participantId);
   const disabled =
     !state.participantId ||
     isExpired(state.session?.last_activity_at) ||
@@ -975,26 +653,10 @@ function renderCards() {
   });
 }
 
-function normalizeConfidence(value) {
-  const numeric = Number.parseFloat(value);
-  if (Number.isNaN(numeric)) {
-    return 0.5;
-  }
-  return clamp(numeric / 100, 0, 1);
-}
-
-function getConfidenceVisuals(confidence) {
-  const clamped = clamp(confidence, 0, 1);
-  const opacity = (0.35 + clamped * 0.65).toFixed(2);
-  const blur = ((1 - clamped) * 2.6).toFixed(2);
-  const saturation = (0.6 + clamped * 0.4).toFixed(2);
-  return { opacity, blur, saturation };
-}
-
 function detectDeadlock(votesMap) {
   const numericVotes = [];
-  votesMap.forEach((vote) => {
-    const numeric = Number.parseFloat(vote.value);
+  votesMap.forEach((value) => {
+    const numeric = Number.parseFloat(value);
     if (!Number.isNaN(numeric)) {
       numericVotes.push(numeric);
     }
@@ -1098,18 +760,8 @@ function pickAdvocateCandidate() {
   if (voters.length === 0) {
     return null;
   }
-
-  const lowConfidence = voters.filter((participant) => {
-    const vote = state.votes.get(participant.id);
-    if (!vote) {
-      return false;
-    }
-    return normalizeConfidence(vote.confidence) <= CONFIDENCE_LOW_THRESHOLD / 100;
-  });
-
-  const pool = lowConfidence.length > 0 ? lowConfidence : voters;
-  const index = randomIndex(pool.length);
-  return pool[index];
+  const index = randomIndex(voters.length);
+  return voters[index];
 }
 
 function renderDevilsAdvocate() {
@@ -1419,11 +1071,6 @@ function errorText(error) {
     .toLowerCase();
 }
 
-function isMissingColumnError(error, column) {
-  const text = errorText(error);
-  return text.includes(`column "${column}"`) && text.includes("does not exist");
-}
-
 function isMissingTableError(error, table) {
   if (error?.code === "42P01") {
     return true;
@@ -1435,24 +1082,6 @@ function isMissingTableError(error, table) {
     text.includes(`relation ${table}`) ||
     text.includes(`relation public.${table}`)
   ) && text.includes("does not exist");
-}
-
-function getVotesErrorMessage(error, fallbackMessage) {
-  if (isMissingTableError(error, "votes")) {
-    return "Votes tabel ontbreekt in Supabase. Draai supabase/schema.sql opnieuw.";
-  }
-  if (isMissingColumnError(error, "confidence")) {
-    return "Votes schema mist de kolom confidence. Draai supabase/schema.sql opnieuw.";
-  }
-  return fallbackMessage;
-}
-
-function isOnConflictError(error) {
-  return error?.code === "42P10" || errorText(error).includes("on conflict");
-}
-
-function isDuplicateKeyError(error) {
-  return error?.code === "23505" || errorText(error).includes("duplicate key");
 }
 
 function randomIndex(max) {
