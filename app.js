@@ -571,6 +571,11 @@ function renderParticipants() {
   if (totalParticipants === 0) {
     const empty = document.createElement("li");
     empty.className = "participant waiting";
+    empty.style.left = "50%";
+    empty.style.top = "22%";
+    empty.style.zIndex = "50";
+    empty.style.setProperty("--name-offset-x", "0px");
+    empty.style.setProperty("--name-offset-y", "84px");
     empty.innerHTML = `
       <div class="card not-voted"></div>
       <div class="avatar" style="background: #e2e8f0; color: #64748b;">?</div>
@@ -627,8 +632,12 @@ function renderParticipants() {
     `;
 
     const { left, top } = getParticipantPosition(index, totalParticipants);
+    const labelOffset = getParticipantLabelOffset(left, top);
     li.style.left = `${left}%`;
     li.style.top = `${top}%`;
+    li.style.zIndex = `${Math.round(top * 10)}`;
+    li.style.setProperty("--name-offset-x", `${labelOffset.x}px`);
+    li.style.setProperty("--name-offset-y", `${labelOffset.y}px`);
 
     // Keep the old vote span for compatibility
     const voteEl = document.createElement("span");
@@ -651,6 +660,18 @@ function getParticipantPosition(index, total) {
   return {
     left: 50 + Math.cos(angle) * radiusX,
     top: 50 + Math.sin(angle) * radiusY
+  };
+}
+
+function getParticipantLabelOffset(left, top) {
+  const dx = left - 50;
+  const dy = top - 50;
+  const distance = 114;
+  const magnitude = Math.hypot(dx, dy) || 1;
+
+  return {
+    x: Math.round((dx / magnitude) * distance),
+    y: Math.round((dy / magnitude) * distance)
   };
 }
 

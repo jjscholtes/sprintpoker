@@ -690,15 +690,22 @@ button:disabled {
   position: absolute;
   left: 50%;
   top: 50%;
+  width: 0;
+  height: 0;
   transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
   background: transparent;
   border: none;
   padding: 0;
   box-shadow: none;
+  overflow: visible;
+}
+
+.participant .card,
+.participant .avatar,
+.participant .name {
+  position: absolute;
+  left: 0;
+  top: 0;
 }
 
 /* Avatar circle */
@@ -716,6 +723,8 @@ button:disabled {
   text-transform: uppercase;
   border: 3px solid white;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transform: translate(-50%, -50%);
+  z-index: 2;
 }
 
 .participant .avatar.emoji {
@@ -724,14 +733,24 @@ button:disabled {
 }
 
 .participant .name {
-  font-size: 13px;
+  transform: translate(
+    calc(-50% + var(--name-offset-x, 0px)),
+    calc(-50% + var(--name-offset-y, 84px))
+  );
+  font-size: 12px;
   font-weight: 500;
   color: var(--ink);
-  max-width: 120px;
+  max-width: 140px;
+  padding: 6px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  z-index: 3;
 }
 
 /* Poker card above avatar */
@@ -745,7 +764,8 @@ button:disabled {
   font-weight: 700;
   font-size: 18px;
   transition: all 0.3s ease;
-  margin-bottom: 4px;
+  transform: translate(-50%, calc(-50% - 64px));
+  z-index: 1;
 }
 
 /* Not voted - grey card outline */
@@ -780,6 +800,8 @@ button:disabled {
 .participant.me .name {
   color: var(--accent);
   font-weight: 600;
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(239, 246, 255, 0.95);
 }
 
 /* Hide old vote element */
@@ -1043,8 +1065,27 @@ button:disabled {
 
   .participant {
     position: static;
+    width: auto;
+    height: auto;
+    transform: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    overflow: visible;
+  }
+
+  .participant .card,
+  .participant .avatar,
+  .participant .name {
+    position: static;
     left: auto;
     top: auto;
+  }
+
+  .participant .name,
+  .participant .card,
+  .participant .avatar {
     transform: none;
   }
 
@@ -1058,6 +1099,10 @@ button:disabled {
     width: 36px;
     height: 52px;
     font-size: 14px;
+  }
+
+  .participant .name {
+    max-width: 110px;
   }
 
   .toolbar-actions {
