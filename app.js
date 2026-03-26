@@ -33,6 +33,7 @@ const els = {
   emojiPicker: document.getElementById("emoji-picker"),
   emojiGrid: document.querySelector(".emoji-grid"),
   table: document.getElementById("table"),
+  tableSurface: document.querySelector(".table-surface"),
   status: document.getElementById("status"),
   average: document.getElementById("average"),
   participants: document.getElementById("participants"),
@@ -567,6 +568,7 @@ function renderParticipants() {
   const nameInstances = {};
   els.participants.innerHTML = "";
   const totalParticipants = state.participants.length;
+  const labelBounds = getParticipantLabelBounds();
 
   if (totalParticipants === 0) {
     const empty = document.createElement("li");
@@ -646,6 +648,7 @@ function renderParticipants() {
     li.appendChild(voteEl);
 
     els.participants.appendChild(li);
+    clampParticipantLabel(li, labelBounds);
   });
 }
 
@@ -666,24 +669,12 @@ function getParticipantPosition(index, total) {
 function getParticipantLabelOffset(left, top) {
   const dx = left - 50;
   const dy = top - 50;
-  const absX = Math.abs(dx);
-  const absY = Math.abs(dy);
-
-  // Keep labels facing the center so edge seats stay inside the table area.
-  if (absY >= absX * 1.2) {
-    return { x: 0, y: dy < 0 ? 74 : -74 };
-  }
-
-  if (absX >= absY * 1.2) {
-    return {
-      x: dx < 0 ? 78 : -78,
-      y: dy === 0 ? 0 : dy < 0 ? 16 : -16
-    };
-  }
+  const distance = 114;
+  const magnitude = Math.hypot(dx, dy) || 1;
 
   return {
-    x: dx < 0 ? 66 : -66,
-    y: dy < 0 ? 44 : -44
+    x: Math.round((dx / magnitude) * distance),
+    y: Math.round((dy / magnitude) * distance)
   };
 }
 
@@ -701,6 +692,52 @@ function getParticipantRadii(total) {
     return { radiusX: 41, radiusY: 33 };
   }
   return { radiusX: 44, radiusY: 35 };
+}
+
+function getParticipantLabelBounds() {
+  if (!els.tableSurface || window.innerWidth <= 768) {
+    return null;
+  }
+
+  const rect = els.tableSurface.getBoundingClientRect();
+  const padding = 18;
+
+  return {
+    left: rect.left + padding,
+    right: rect.right - padding,
+    top: rect.top + padding,
+    bottom: rect.bottom - padding
+  };
+}
+
+function clampParticipantLabel(participantEl, bounds) {
+  if (!bounds) {
+    return;
+  }
+
+  const nameEl = participantEl.querySelector(".name");
+  if (!nameEl) {
+    return;
+  }
+
+  const rect = nameEl.getBoundingClientRect();
+  let nextX = Number.parseFloat(participantEl.style.getPropertyValue("--name-offset-x")) || 0;
+  let nextY = Number.parseFloat(participantEl.style.getPropertyValue("--name-offset-y")) || 0;
+
+  if (rect.left < bounds.left) {
+    nextX += bounds.left - rect.left;
+  } else if (rect.right > bounds.right) {
+    nextX -= rect.right - bounds.right;
+  }
+
+  if (rect.top < bounds.top) {
+    nextY += bounds.top - rect.top;
+  } else if (rect.bottom > bounds.bottom) {
+    nextY -= rect.bottom - bounds.bottom;
+  }
+
+  participantEl.style.setProperty("--name-offset-x", `${Math.round(nextX)}px`);
+  participantEl.style.setProperty("--name-offset-y", `${Math.round(nextY)}px`);
 }
 
 function renderStatus() {
