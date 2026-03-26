@@ -666,12 +666,24 @@ function getParticipantPosition(index, total) {
 function getParticipantLabelOffset(left, top) {
   const dx = left - 50;
   const dy = top - 50;
-  const distance = 114;
-  const magnitude = Math.hypot(dx, dy) || 1;
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+
+  // Keep labels facing the center so edge seats stay inside the table area.
+  if (absY >= absX * 1.2) {
+    return { x: 0, y: dy < 0 ? 74 : -74 };
+  }
+
+  if (absX >= absY * 1.2) {
+    return {
+      x: dx < 0 ? 78 : -78,
+      y: dy === 0 ? 0 : dy < 0 ? 16 : -16
+    };
+  }
 
   return {
-    x: Math.round((dx / magnitude) * distance),
-    y: Math.round((dy / magnitude) * distance)
+    x: dx < 0 ? 66 : -66,
+    y: dy < 0 ? 44 : -44
   };
 }
 
