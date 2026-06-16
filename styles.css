@@ -724,7 +724,7 @@ button:disabled {
   border: 3px solid white;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transform: translate(-50%, -50%);
-  z-index: 2;
+  z-index: 3;
 }
 
 .participant .avatar.emoji {
@@ -750,10 +750,10 @@ button:disabled {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  z-index: 3;
+  z-index: 4;
 }
 
-/* Poker card above avatar */
+/* Poker card faces inward, away from the participant name */
 .participant .card {
   width: 44px;
   height: 64px;
@@ -764,8 +764,11 @@ button:disabled {
   font-weight: 700;
   font-size: 18px;
   transition: all 0.3s ease;
-  transform: translate(-50%, calc(-50% - 64px));
-  z-index: 1;
+  transform: translate(
+    calc(-50% + var(--card-offset-x, 0px)),
+    calc(-50% + var(--card-offset-y, -64px))
+  );
+  z-index: 2;
 }
 
 /* Not voted - grey card outline */

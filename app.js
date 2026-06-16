@@ -1,4 +1,4 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2/+esm";
 
 const CONFIG_ENDPOINTS = ["/config.json", "/api/config"];
 
@@ -559,13 +559,13 @@ function renderParticipants() {
     return;
   }
 
-  const nameCounts = {};
+  const nameCounts = Object.create(null);
   state.participants.forEach((participant) => {
     const key = participant.name || "Unknown";
     nameCounts[key] = (nameCounts[key] || 0) + 1;
   });
 
-  const nameInstances = {};
+  const nameInstances = Object.create(null);
   els.participants.innerHTML = "";
   const totalParticipants = state.participants.length;
   const labelBounds = getParticipantLabelBounds();
@@ -578,11 +578,17 @@ function renderParticipants() {
     empty.style.zIndex = "50";
     empty.style.setProperty("--name-offset-x", "0px");
     empty.style.setProperty("--name-offset-y", "84px");
-    empty.innerHTML = `
-      <div class="card not-voted"></div>
-      <div class="avatar" style="background: #e2e8f0; color: #64748b;">?</div>
-      <span class="name">Waiting...</span>
-    `;
+    const card = document.createElement("div");
+    card.className = "card not-voted";
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.style.background = "#e2e8f0";
+    avatar.style.color = "#64748b";
+    avatar.textContent = "?";
+    const nameEl = document.createElement("span");
+    nameEl.className = "name";
+    nameEl.textContent = "Waiting...";
+    empty.append(card, avatar, nameEl);
     els.participants.appendChild(empty);
     return;
   }
@@ -627,19 +633,32 @@ function renderParticipants() {
       cardContent = "";
     }
 
-    li.innerHTML = `
-      <div class="${cardClass}">${cardContent}</div>
-      <div class="${avatarClass}" style="background: ${avatarColor}">${avatarContent}</div>
-      <span class="name">${displayName}</span>
-    `;
+    const card = document.createElement("div");
+    card.className = cardClass;
+    card.textContent = cardContent;
+
+    const avatar = document.createElement("div");
+    avatar.className = avatarClass;
+    avatar.style.background = avatarColor;
+    avatar.textContent = avatarContent;
+
+    const nameEl = document.createElement("span");
+    nameEl.className = "name";
+    nameEl.textContent = displayName;
+    nameEl.title = displayName;
+
+    li.append(card, avatar, nameEl);
 
     const { left, top } = getParticipantPosition(index, totalParticipants);
     const labelOffset = getParticipantLabelOffset(left, top);
+    const cardOffset = getParticipantCardOffset(left, top);
     li.style.left = `${left}%`;
     li.style.top = `${top}%`;
     li.style.zIndex = `${Math.round(top * 10)}`;
     li.style.setProperty("--name-offset-x", `${labelOffset.x}px`);
     li.style.setProperty("--name-offset-y", `${labelOffset.y}px`);
+    li.style.setProperty("--card-offset-x", `${cardOffset.x}px`);
+    li.style.setProperty("--card-offset-y", `${cardOffset.y}px`);
 
     // Keep the old vote span for compatibility
     const voteEl = document.createElement("span");
@@ -675,6 +694,18 @@ function getParticipantLabelOffset(left, top) {
   return {
     x: Math.round((dx / magnitude) * distance),
     y: Math.round((dy / magnitude) * distance)
+  };
+}
+
+function getParticipantCardOffset(left, top) {
+  const dx = left - 50;
+  const dy = top - 50;
+  const distance = 68;
+  const magnitude = Math.hypot(dx, dy) || 1;
+
+  return {
+    x: Math.round((-dx / magnitude) * distance),
+    y: Math.round((-dy / magnitude) * distance)
   };
 }
 
